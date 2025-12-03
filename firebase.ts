@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyANU6ZUxqChdzI-Y_9MfEmy8DnTXsDy-e0",
@@ -22,4 +22,15 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 });
 
 export const db = getFirestore(app);
+
+// Enable offline persistence for Firestore
+// This prevents "Backend didn't respond within 10 seconds" errors on slow connections
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.warn("Firestore persistence enabled in another tab already");
+    } else if (err.code == 'unimplemented') {
+        console.warn("Browser doesn't support persistence");
+    }
+});
+
 export const googleProvider = new GoogleAuthProvider();

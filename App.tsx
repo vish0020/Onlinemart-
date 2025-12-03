@@ -1,7 +1,6 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom';
-import { Home, ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, LogIn, Mail, Lock, UserPlus, Shield } from 'lucide-react';
+import { Home, ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, LogIn, Mail, Lock, UserPlus, Shield, X, Clock, ArrowRight } from 'lucide-react';
 import { AppState, Address } from './types';
 import { api } from './services/mockService';
 import { Logo, Button, AddressForm, Input } from './components/Shared';
@@ -10,15 +9,162 @@ import { AdminDashboard, AdminProducts, AdminOrdersPage, AdminReviewsPage } from
 import { TermsPage, PrivacyPage } from './pages/InfoPages';
 import { AppProvider, useAppContext } from './Context';
 
+// --- Search Overlay Component ---
+const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
+    const { state, dispatch } = useAppContext();
+    const navigate = useNavigate();
+    const [query, setQuery] = useState(state.searchQuery || '');
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+    useEffect(() => {
+        // Auto-focus input
+        if(inputRef.current) inputRef.current.focus();
+
+        // Load recent searches
+        const stored = localStorage.getItem('om_search_history');
+        if (stored) setRecentSearches(JSON.parse(stored));
+    }, []);
+
+    const handleSearch = (searchTerm: string) => {
+        if (!searchTerm.trim()) return;
+        
+        // Save to history
+        const newHistory = [searchTerm, ...recentSearches.filter(s => s !== searchTerm)].slice(0, 5);
+        localStorage.setItem('om_search_history', JSON.stringify(newHistory));
+        setRecentSearches(newHistory);
+
+        // Execute Search
+        dispatch({ type: 'SET_SEARCH', payload: searchTerm });
+        onClose();
+        navigate('/'); // Redirect to Home (Results Page)
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch(query);
+        }
+    };
+
+    // Live suggestions from products
+    const suggestions = query ? state.products.filter(p => 
+        p.name.toLowerCase().includes(query.toLowerCase()) || 
+        p.category.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 5) : [];
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-gray-900 animate-fade-in flex flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-4 border-b dark:border-gray-800">
+                <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                     <X size={24} className="text-gray-600 dark:text-gray-300"/>
+                </button>
+                <div className="flex-1 relative">
+                    <input 
+                        ref={inputRef}
+                        type="text"
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Search for products..."
+                        className="w-full text-lg bg-transparent outline-none dark:text-white placeholder-gray-400"
+                    />
+                </div>
+                {query && (
+                    <button onClick={() => setQuery('')} className="p-2 text-gray-400 hover:text-gray-600">
+                        <X size={20} className="fill-current" />
+                    </button>
+                )}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+                {query === '' ? (
+                    <div>
+                        {recentSearches.length > 0 && (
+                            <div className="mb-6">
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Recent Searches</h3>
+                                <div className="space-y-3">
+                                    {recentSearches.map(term => (
+                                        <div 
+                                            key={term} 
+                                            onClick={() => handleSearch(term)}
+                                            className="flex items-center gap-3 text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-lg -mx-2"
+                                        >
+                                            <Clock size={16} className="text-gray-400" />
+                                            <span>{term}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div>
+                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Popular Categories</h3>
+                             <div className="flex flex-wrap gap-2">
+                                 {['Electronics', 'Fashion', 'Home & Kitchen', 'Beauty', 'Toys'].map(cat => (
+                                     <button 
+                                        key={cat}
+                                        onClick={() => handleSearch(cat)}
+                                        className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-sm hover:bg-primary/20 hover:text-primary-dark transition-colors dark:text-gray-300"
+                                     >
+                                         {cat}
+                                     </button>
+                                 ))}
+                             </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div>
+                         {suggestions.length > 0 ? (
+                             <div className="space-y-2">
+                                 {suggestions.map(p => (
+                                     <div 
+                                        key={p.id} 
+                                        onClick={() => {
+                                            navigate(`/product/${p.id}`);
+                                            onClose();
+                                        }}
+                                        className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer -mx-2"
+                                     >
+                                         <Search size={16} className="text-gray-400" />
+                                         <div className="flex-1">
+                                             <p className="text-sm font-medium dark:text-white line-clamp-1">{p.name}</p>
+                                             <p className="text-xs text-gray-500">{p.category}</p>
+                                         </div>
+                                         <ArrowRight size={16} className="text-gray-300" />
+                                     </div>
+                                 ))}
+                                 <button 
+                                    onClick={() => handleSearch(query)}
+                                    className="w-full text-left p-3 mt-2 text-primary font-bold hover:bg-primary/5 rounded-lg flex items-center gap-2"
+                                 >
+                                    <Search size={16} /> See all results for "{query}"
+                                 </button>
+                             </div>
+                         ) : (
+                             <div className="text-center py-10 text-gray-500">
+                                 <p>No matches found.</p>
+                                 <button onClick={() => handleSearch(query)} className="text-primary font-bold mt-2">Search anyway</button>
+                             </div>
+                         )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // --- Layout Components ---
 
 const NavBar = () => {
   const { state, dispatch, setShowLoginModal } = useAppContext();
   const navigate = useNavigate();
-  const [showSearch, setShowSearch] = useState(false);
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
 
   return (
     <>
+      {showSearchOverlay && <SearchOverlay onClose={() => setShowSearchOverlay(false)} />}
+      
       <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b dark:border-gray-800 shadow-sm transition-colors">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to="/">
@@ -26,10 +172,10 @@ const NavBar = () => {
           </Link>
 
           <div className="flex items-center gap-3">
-            {/* Search Toggle */}
+            {/* Search Toggle Button */}
             <button 
-                onClick={() => setShowSearch(!showSearch)} 
-                className={`p-2 rounded-full transition-colors ${showSearch ? 'bg-gray-100 dark:bg-gray-800 text-primary' : 'text-gray-600 dark:text-gray-300'}`}
+                onClick={() => setShowSearchOverlay(true)} 
+                className="p-2 rounded-full transition-colors bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
             >
                 <Search size={22} />
             </button>
@@ -54,23 +200,6 @@ const NavBar = () => {
             </Link>
           </div>
         </div>
-        
-        {/* Expandable Search Input */}
-        {showSearch && (
-          <div className="px-4 pb-3 animate-slide-up">
-            <div className="relative">
-               <input 
-                 type="text" 
-                 placeholder="Search for products, brands..." 
-                 autoFocus
-                 className="w-full bg-gray-100 dark:bg-gray-800 px-4 py-2 pl-10 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white border border-transparent"
-                 value={state.searchQuery}
-                 onChange={(e) => dispatch({type: 'SET_SEARCH', payload: e.target.value})}
-               />
-               <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-            </div>
-          </div>
-        )}
       </header>
     </>
   );

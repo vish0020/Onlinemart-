@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -441,9 +440,14 @@ export const HomePage = () => {
       dispatch({ type: 'SET_PRODUCTS', payload: prods });
     };
   
-    const categories = useMemo(() => {
-       return Object.keys(PRODUCT_CATEGORIES);
-    }, []);
+    // Filter categories to only show those that have available products
+    const availableCategories = useMemo(() => {
+       const allCats = Object.keys(PRODUCT_CATEGORIES);
+       if (state.products.length === 0) return allCats;
+       
+       const productCats = new Set(state.products.map(p => p.category));
+       return allCats.filter(cat => productCats.has(cat));
+    }, [state.products]);
   
     const displayedProducts = useMemo(() => {
       if (state.searchQuery) {
@@ -477,6 +481,7 @@ export const HomePage = () => {
           dispatch({ type: 'SET_SEARCH', payload: '' });
       } else {
           dispatch({ type: 'SET_SEARCH', payload: cat });
+          // Ensure we are in a state to see results if we were searching
       }
     };
   
@@ -513,7 +518,7 @@ export const HomePage = () => {
         />
   
         {/* Hero Banner Carousel */}
-        {visibleBanners.length > 0 ? (
+        {!state.searchQuery && visibleBanners.length > 0 && (
             <div className="relative w-full aspect-[21/9] md:aspect-[3/1] bg-gray-200 rounded-b-xl md:rounded-3xl md:mx-0 overflow-hidden shadow-md mx-0 group">
                 {/* Slides Container */}
                 <div 
@@ -549,9 +554,11 @@ export const HomePage = () => {
                     ))}
                 </div>
             </div>
-        ) : (
-          !loading && (
-              <div className="relative w-full aspect-[21/9] md:aspect-[3/1] bg-gradient-to-r from-primary-light to-primary rounded-b-xl md:rounded-3xl overflow-hidden shadow-md">
+        )}
+
+        {/* Fallback Banner */}
+        {!state.searchQuery && visibleBanners.length === 0 && !loading && (
+             <div className="relative w-full aspect-[21/9] md:aspect-[3/1] bg-gradient-to-r from-primary-light to-primary rounded-b-xl md:rounded-3xl overflow-hidden shadow-md">
                   <div className="absolute inset-0 flex items-center justify-between px-6 md:px-12">
                   <div className="w-2/3 z-10">
                       <h1 className="text-2xl md:text-5xl font-extrabold text-black mb-2 leading-tight">
@@ -561,32 +568,33 @@ export const HomePage = () => {
                   </div>
                   </div>
               </div>
-          )
         )}
   
-        {/* Categories */}
-        <div>
-          <SectionHeader 
-              title="Categories" 
-              onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: '' })} 
-          />
-          <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pb-2">
-            {loading ? [1,2,3,4].map(i => <Skeleton key={i} className="w-20 h-20 flex-shrink-0 rounded-full" />) :
-             categories.map(cat => {
-              const isActive = state.searchQuery === cat;
-              return (
-                  <div key={cat} onClick={() => handleCategoryClick(cat)} className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group select-none">
-                  <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center shadow-sm transition-all duration-300 ${isActive ? 'bg-primary border-primary scale-110' : 'bg-white dark:bg-gray-800 border-primary/20 group-hover:border-primary'}`}>
-                      <div className={`transition-colors ${isActive ? 'text-black' : 'text-primary'}`}>
-                          {CATEGORY_ICONS[cat] || <ShoppingBag />}
-                      </div>
-                  </div>
-                  <span className={`text-xs font-medium w-20 text-center truncate transition-colors ${isActive ? 'text-primary font-bold' : 'dark:text-gray-300'}`}>{cat}</span>
-                  </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* Categories (Only show if no search query) */}
+        {!state.searchQuery && (
+            <div>
+            <SectionHeader 
+                title="Categories" 
+                onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: '' })} 
+            />
+            <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pb-2">
+                {loading ? [1,2,3,4].map(i => <Skeleton key={i} className="w-20 h-20 flex-shrink-0 rounded-full" />) :
+                availableCategories.map(cat => {
+                const isActive = state.searchQuery === cat;
+                return (
+                    <div key={cat} onClick={() => handleCategoryClick(cat)} className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group select-none">
+                    <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center shadow-sm transition-all duration-300 ${isActive ? 'bg-primary border-primary scale-110' : 'bg-white dark:bg-gray-800 border-primary/20 group-hover:border-primary'}`}>
+                        <div className={`transition-colors ${isActive ? 'text-black' : 'text-primary'}`}>
+                            {CATEGORY_ICONS[cat] || <ShoppingBag />}
+                        </div>
+                    </div>
+                    <span className={`text-xs font-medium w-20 text-center truncate transition-colors ${isActive ? 'text-primary font-bold' : 'dark:text-gray-300'}`}>{cat}</span>
+                    </div>
+                );
+                })}
+            </div>
+            </div>
+        )}
   
         {/* Recommended / Search Results */}
         <div id="products" className="px-4">
@@ -595,6 +603,18 @@ export const HomePage = () => {
               ? `Results for "${state.searchQuery}"` 
               : 'Recommended for You'}
           </h2>
+
+           {/* Clear Search Button for Result Page */}
+           {state.searchQuery && (
+               <div className="flex items-center gap-2 mb-4">
+                    <button 
+                        onClick={() => dispatch({type: 'SET_SEARCH', payload: ''})}
+                        className="text-sm bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-gray-300 dark:hover:bg-gray-600 dark:text-white"
+                    >
+                        Clear Search <X size={14}/>
+                    </button>
+               </div>
+           )}
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {loading 
@@ -612,7 +632,11 @@ export const HomePage = () => {
             }
           </div>
           {displayedProducts.length === 0 && !loading && (
-             <div className="text-center py-10 text-gray-500">No products found.</div>
+             <div className="text-center py-10 text-gray-500">
+                 <Search size={48} className="mx-auto mb-2 opacity-20"/>
+                 <p>No products found matching your criteria.</p>
+                 <Button variant="ghost" className="mt-2 text-primary" onClick={() => dispatch({type: 'SET_SEARCH', payload: ''})}>See all products</Button>
+             </div>
           )}
         </div>
   

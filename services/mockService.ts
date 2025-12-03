@@ -83,6 +83,8 @@ const DEFAULT_SETTINGS: DeliverySettings = {
     storeLocation: DEFAULT_STORE_LOCATION
 };
 
+const ADMIN_EMAIL = "onlinemart0020@gmail.com";
+
 // --- Helper Functions ---
 
 const convertDoc = <T>(docSnap: any): T => {
@@ -100,32 +102,49 @@ const convertDoc = <T>(docSnap: any): T => {
     return { id: docSnap.id, ...data } as T;
 };
 
+// --- API Service (Firebase Implementation) ---
+
 // Helper to handle user document creation/retrieval for any auth method
 const handleUserAuth = async (firebaseUser: FirebaseUser): Promise<User> => {
+    // 1. Identify Admin
+    const isAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+    // 2. Prepare User Reference & Default Data
     const userRef = doc(db, "users", firebaseUser.uid);
-    const userSnap = await getDoc(userRef);
+    const basicUserData: User = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest User' : 'User'),
+        photoURL: firebaseUser.photoURL || '',
+        isAdmin: isAdmin,
+        isAnonymous: firebaseUser.isAnonymous,
+        phone: ''
+    };
 
-    let userData: User;
+    try {
+        // 3. Try fetching from Firestore
+        const userSnap = await getDoc(userRef);
 
-    if (userSnap.exists()) {
-        userData = convertDoc<User>(userSnap);
-    } else {
-        // Create new user
-        userData = {
-            id: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            name: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest User' : 'User'),
-            photoURL: firebaseUser.photoURL || '',
-            isAdmin: false, // Default to false. Must be set manually in Firestore Console.
-            isAnonymous: firebaseUser.isAnonymous
-        };
-        await setDoc(userRef, userData);
+        if (userSnap.exists()) {
+            const data = convertDoc<User>(userSnap);
+            
+            // 4. Force Admin update if email matches but DB says false
+            if (isAdmin && !data.isAdmin) {
+                await updateDoc(userRef, { isAdmin: true });
+                return { ...data, isAdmin: true };
+            }
+            return data;
+        } else {
+            // 5. Create new user if not exists
+            await setDoc(userRef, basicUserData);
+            return basicUserData;
+        }
+    } catch (e) {
+        console.error("Firestore user fetch failed, using basic auth profile:", e);
+        // 6. Fallback: Return basic user data so login SUCCEEDS even if DB fails
+        return basicUserData;
     }
-
-    return userData;
 };
-
-// --- API Service (Firebase Implementation) ---
 
 export const api = {
   // Products
@@ -176,24 +195,12 @@ export const api = {
   subscribeToAuth: (callback: (user: User | null) => void) => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        try {
-            const user = await handleUserAuth(firebaseUser);
-            callback(user);
-        } catch (e) {
-            console.error("Auth state change error", e);
-            // Fallback: If DB fetch fails, keep user logged in with basic info to avoid logout loops on flakey connections
-            const fallbackUser: User = {
-                id: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                name: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest User' : 'User'),
-                photoURL: firebaseUser.photoURL || '',
-                isAdmin: false,
-                isAnonymous: firebaseUser.isAnonymous
-            };
-            callback(fallbackUser);
-        }
+          // Pass basic user info immediately to UI to prevent "logout blink"
+          // callback(basicUser); <--- Optional: could add this if loading is slow
+          const user = await handleUserAuth(firebaseUser);
+          callback(user);
       } else {
-        callback(null);
+          callback(null);
       }
     });
   },
