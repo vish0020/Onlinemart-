@@ -181,7 +181,16 @@ export const api = {
             callback(user);
         } catch (e) {
             console.error("Auth state change error", e);
-            callback(null);
+            // Fallback: If DB fetch fails, keep user logged in with basic info to avoid logout loops on flakey connections
+            const fallbackUser: User = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                name: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest User' : 'User'),
+                photoURL: firebaseUser.photoURL || '',
+                isAdmin: false,
+                isAnonymous: firebaseUser.isAnonymous
+            };
+            callback(fallbackUser);
         }
       } else {
         callback(null);
