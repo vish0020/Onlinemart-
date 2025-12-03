@@ -1,0 +1,5 @@
+{
+  "name": "OnlineMart",
+  "description": "A modern, yellow-themed e-commerce PWA with admin dashboard, real-time inventory simulation, and delivery calculation.",
+  "requestFramePermissions": []
+}
