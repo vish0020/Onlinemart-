@@ -26,13 +26,21 @@ export const Logo: React.FC<{ size?: "sm" | "md" | "lg" }> = ({ size = "md" }) =
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   isLoading?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const Button: React.FC<ButtonProps> = ({ 
-  children, variant = 'primary', className = '', isLoading, ...props 
+  children, variant = 'primary', size = 'md', className = '', isLoading, ...props 
 }) => {
   
-  const base = "px-4 py-3 rounded-lg font-semibold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  const sizeClasses = {
+      sm: "px-3 py-1.5 text-xs",
+      md: "px-4 py-3 text-sm",
+      lg: "px-6 py-4 text-base"
+  };
+
+  const base = `rounded-lg font-semibold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClasses[size]}`;
+  
   const variants = {
     primary: "bg-primary text-black shadow-md hover:bg-primary-dark",
     secondary: "bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black",

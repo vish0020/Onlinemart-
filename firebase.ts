@@ -3,6 +3,8 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
+// --- 1. Firebase Configuration ---
+// Replace these values with your actual Firebase project configuration if needed.
 const firebaseConfig = {
   apiKey: "AIzaSyANU6ZUxqChdzI-Y_9MfEmy8DnTXsDy-e0",
   authDomain: "onlinemart-7768c.firebaseapp.com",
@@ -13,24 +15,25 @@ const firebaseConfig = {
   measurementId: "G-DWRPB7R2DN"
 };
 
+// --- 2. Initialize App ---
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
 
-// Explicitly set persistence to local to ensure login state survives browser refreshes/restarts
+// --- 3. Initialize Auth & Persistence ---
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+
+// Force persistence to LOCAL (survives refresh and browser restart)
 setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.error("Error setting auth persistence:", error);
+    console.error("Auth Persistence Error:", error);
 });
 
+// --- 4. Initialize Firestore & Offline Support ---
 export const db = getFirestore(app);
 
-// Enable offline persistence for Firestore
-// This prevents "Backend didn't respond within 10 seconds" errors on slow connections
 enableIndexedDbPersistence(db).catch((err) => {
     if (err.code == 'failed-precondition') {
-        console.warn("Firestore persistence enabled in another tab already");
+        console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time.");
     } else if (err.code == 'unimplemented') {
-        console.warn("Browser doesn't support persistence");
+        console.warn("The current browser does not support all of the features required to enable persistence");
     }
 });
-
-export const googleProvider = new GoogleAuthProvider();

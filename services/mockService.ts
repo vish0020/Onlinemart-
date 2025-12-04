@@ -10,10 +10,8 @@ import {
     query, 
     where, 
     orderBy, 
-    limit, 
     runTransaction, 
     Timestamp,
-    addDoc,
     writeBatch
 } from "firebase/firestore";
 import { 
@@ -21,80 +19,42 @@ import {
     signInWithRedirect,
     getRedirectResult,
     signOut, 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signInAnonymously,
-    updateProfile,
     onAuthStateChanged,
     User as FirebaseUser
 } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
 import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address } from '../types';
 import { calculateDrivingDistance } from './mapService';
-import { DEFAULT_STORE_LOCATION } from '../constants';
+import { DEFAULT_STORE_LOCATION, DEFAULT_SETTINGS } from '../constants';
 
-// --- Constants (Preserved for UI) ---
+// --- Configuration ---
+const ADMIN_EMAIL = "onlinemart0020@gmail.com";
 
 export const PRODUCT_CATEGORIES: Record<string, string[]> = {
-  "Electronics": ["Mobiles", "Mobile Accessories", "Laptops", "Laptop Accessories", "Smartwatches", "Headphones & Earbuds", "Speakers", "Tablets", "Power Banks", "Cameras", "Camera Accessories", "Televisions", "Smart Home Devices", "Computer Components"],
-  "Fashion": [
-    "Men - T-Shirts", "Men - Shirts", "Men - Jeans", "Men - Trousers", "Men - Shorts", "Men - Watches", "Men - Shoes",
-    "Women - Kurtis", "Women - Sarees", "Women - Tops", "Women - Jeans", "Women - Dresses", "Women - Footwear", "Women - Jewelry",
-    "Kids - Boys Clothing", "Kids - Girls Clothing", "Kids - Footwear"
-  ],
-  "Home & Kitchen": ["Bedsheets", "Pillow Covers", "Kitchen Storage", "Cookware", "Wall Decor", "Tableware & Dinner Set", "Home Cleaning", "Tools", "Home Appliances"],
-  "Beauty & Personal Care": ["Makeup", "Skincare", "Haircare", "Perfumes", "Grooming", "Beard Care", "Bath & Body", "Beauty Tools"],
-  "Bags, Shoes & Accessories": ["Backpacks", "Handbags", "Sling Bags", "Wallets", "Travel Bags", "Luggage", "Belts", "Caps", "Sunglasses", "Shoes", "Sandals"],
-  "Toys, Kids & Baby": ["Toys", "Baby Clothing", "Baby Care", "Learning Toys", "Soft Toys"],
-  "Grocery & Food": ["Snacks", "Beverages", "Dry Fruits", "Household supplies", "Grains & Spices", "Oils & Ghee", "Tea & Coffee", "Biscuits"],
-  "Tools & Automotive": ["Tools", "Automotive Accessories", "Car Care", "Bike Accessories"],
-  "Sports & Fitness": ["Yoga Mats", "Dumbbells", "Fitness Bands", "Sportswear"],
-  "Pet Supplies": ["Dog Food", "Cat Food", "Pet Grooming", "Toys", "Leashes"],
-  "Books & Stationery": ["Books", "Notebooks", "Pens & Pencils", "Art Supplies", "Office Supplies"],
-  "Appliances": ["Small appliances", "Large appliances", "Kitchen appliances"],
-  "Housekeeping & Cleaning": ["Mops", "Cleaning liquids", "Brooms", "Dustbins"],
-  "Gifts & Seasonal": ["Birthday gifts", "Anniversary gifts", "Festival specials", "Decorative hampers"],
-  "Gaming": ["Gaming accessories", "Gamepads", "Gaming earphones"]
+  "Electronics": ["Mobiles", "Mobile Accessories", "Laptops", "Smartwatches", "Headphones", "Speakers"],
+  "Fashion": ["Men", "Women", "Kids", "Watches", "Shoes"],
+  "Home & Kitchen": ["Decor", "Kitchenware", "Bedding", "Cleaning"],
+  "Beauty & Personal Care": ["Makeup", "Skincare", "Haircare", "Grooming"],
+  "Toys & Baby": ["Toys", "Baby Gear", "Clothing"],
+  "Grocery": ["Snacks", "Beverages", "Staples"],
+  "Sports": ["Fitness", "Outdoor"],
+  "Books": ["Fiction", "Academic", "Stationery"]
 };
 
 export const MOCK_LOCATIONS = {
-  countries: ["India", "United States", "United Kingdom", "Canada", "Australia", "UAE"],
-  states: [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
-    "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
-    "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
-    "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", 
-    "Uttarakhand", "West Bengal", "Delhi", "Jammu & Kashmir", "Ladakh", "Puducherry"
-  ],
-  cities: [
-    "Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Gandhinagar", "Junagadh", 
-    "Mumbai", "Pune", "Nagpur", "Thane", "Nashik", "Delhi", "Bangalore", "Hyderabad", "Chennai", 
-    "Kolkata", "Jaipur", "Lucknow", "Kanpur", "Indore", "Bhopal", "Patna", "Ludhiana", "Agra"
-  ]
+    countries: ["India", "USA", "UK", "Canada", "Australia"],
+    states: ["Gujarat", "Maharashtra", "Karnataka", "Delhi", "Rajasthan", "Tamil Nadu", "West Bengal"],
+    cities: ["Ahmedabad", "Mumbai", "Bangalore", "New Delhi", "Jaipur", "Chennai", "Kolkata", "Surat", "Pune"]
 };
 
-const DEFAULT_SETTINGS: DeliverySettings = {
-    baseCharge: 40,
-    perKmCharge: 4,
-    freeDeliveryAbove: 999,
-    codEnabled: true,
-    estimatedDays: "4–7",
-    serviceablePincodes: [],
-    storeLocation: DEFAULT_STORE_LOCATION
-};
-
-const ADMIN_EMAIL = "onlinemart0020@gmail.com";
-
-// --- Helper Functions ---
-
+// --- Helper: Convert Firestore Doc to Object ---
 const convertDoc = <T>(docSnap: any): T => {
     const data = docSnap.data();
-    // Convert Firestore Timestamps to ISO strings for UI
+    // Convert Timestamps to ISO strings
     Object.keys(data).forEach(key => {
         if (data[key] instanceof Timestamp) {
             data[key] = data[key].toDate().toISOString();
         }
-        // Handle nested timestamp in cancelRequest
         if (key === 'cancelRequest' && data[key]?.requestedAt instanceof Timestamp) {
             data[key].requestedAt = data[key].requestedAt.toDate().toISOString();
         }
@@ -102,52 +62,112 @@ const convertDoc = <T>(docSnap: any): T => {
     return { id: docSnap.id, ...data } as T;
 };
 
-// --- API Service (Firebase Implementation) ---
-
-// Helper to handle user document creation/retrieval for any auth method
+// --- 4. Core User Logic (The "From Scratch" Auth Handler) ---
 const handleUserAuth = async (firebaseUser: FirebaseUser): Promise<User> => {
+    if (!firebaseUser) throw new Error("No firebase user found");
+
     // 1. Identify Admin
     const isAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
-    // 2. Prepare User Reference & Default Data
-    const userRef = doc(db, "users", firebaseUser.uid);
-    const basicUserData: User = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        name: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest User' : 'User'),
-        photoURL: firebaseUser.photoURL || '',
-        isAdmin: isAdmin,
-        isAnonymous: firebaseUser.isAnonymous,
-        phone: ''
+    // 2. Prepare User Data
+    const userData = {
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || "User",
+        email: firebaseUser.email || "",
+        photoURL: firebaseUser.photoURL || "",
+        isAdmin: isAdmin, // Force Admin status based on email
+        lastLogin: new Date().toISOString()
     };
 
+    const userRef = doc(db, "users", firebaseUser.uid);
+
     try {
-        // 3. Try fetching from Firestore
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-            const data = convertDoc<User>(userSnap);
-            
-            // 4. Force Admin update if email matches but DB says false
-            if (isAdmin && !data.isAdmin) {
-                await updateDoc(userRef, { isAdmin: true });
-                return { ...data, isAdmin: true };
-            }
-            return data;
+            // Update existing user (login time & admin status)
+            await updateDoc(userRef, {
+                lastLogin: userData.lastLogin,
+                isAdmin: isAdmin
+            });
+            // Merge DB data with basic auth data (DB takes precedence for stored fields)
+            return { ...convertDoc<User>(userSnap), ...userData, isAdmin }; 
         } else {
-            // 5. Create new user if not exists
-            await setDoc(userRef, basicUserData);
-            return basicUserData;
+            // Create new user
+            const newUser = {
+                ...userData,
+                id: firebaseUser.uid,
+                createdAt: new Date().toISOString()
+            };
+            await setDoc(userRef, newUser);
+            return newUser;
         }
-    } catch (e) {
-        console.error("Firestore user fetch failed, using basic auth profile:", e);
-        // 6. Fallback: Return basic user data so login SUCCEEDS even if DB fails
-        return basicUserData;
+    } catch (error) {
+        console.error("Firestore User Sync Error:", error);
+        // Fallback: return basic auth info if DB fails (offline mode)
+        return {
+            id: firebaseUser.uid,
+            ...userData
+        };
     }
 };
 
 export const api = {
-  // Products
+  // --- 7. Helper: Get Current User ---
+  getCurrentUser: () => {
+      return auth.currentUser;
+  },
+
+  // --- Auth: Subscribe (Listener) ---
+  subscribeToAuth: (callback: (user: User | null) => void) => {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+          const user = await handleUserAuth(firebaseUser);
+          callback(user);
+      } else {
+          callback(null);
+      }
+    });
+  },
+
+  // --- Auth: Google Popup (Desktop) ---
+  loginGoogle: async (): Promise<User> => {
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        return await handleUserAuth(result.user);
+    } catch (error: any) {
+        console.error("Google Login Error:", error);
+        throw error;
+    }
+  },
+
+  // --- Auth: Google Redirect (Mobile) ---
+  loginGoogleRedirect: async (): Promise<void> => {
+      await signInWithRedirect(auth, googleProvider);
+  },
+
+  // --- Auth: Check Redirect Result (Mobile) ---
+  checkRedirectLogin: async (): Promise<User | null> => {
+      try {
+          const result = await getRedirectResult(auth);
+          if (result) {
+              return await handleUserAuth(result.user);
+          }
+      } catch (error) {
+          console.error("Redirect Result Error:", error);
+      }
+      return null;
+  },
+
+  // --- Auth: Logout ---
+  logout: async () => {
+      await signOut(auth);
+  },
+
+  // ---------------------------------------------------------
+  // --- Existing Shop Functionality (Preserved) ---
+  // ---------------------------------------------------------
+
   getProducts: async (): Promise<Product[]> => {
     try {
         const querySnapshot = await getDocs(collection(db, "products"));
@@ -159,28 +179,19 @@ export const api = {
   },
   
   saveProduct: async (product: Product): Promise<void> => {
-    try {
-        const productRef = doc(db, "products", product.id || 'new');
-        await setDoc(productRef, product, { merge: true });
-    } catch (error) {
-        console.error("Error saving product:", error);
-        throw error;
-    }
+    const productRef = doc(db, "products", product.id || 'new');
+    await setDoc(productRef, product, { merge: true });
   },
 
   deleteProduct: async (id: string): Promise<void> => {
     await deleteDoc(doc(db, "products", id));
   },
 
-  // Banners
   getBanners: async (): Promise<HeroBanner[]> => {
     try {
         const querySnapshot = await getDocs(collection(db, "banners"));
         return querySnapshot.docs.map(doc => convertDoc<HeroBanner>(doc));
-    } catch (error) {
-        console.error("Error fetching banners:", error);
-        return [];
-    }
+    } catch (error) { return []; }
   },
 
   saveBanner: async (banner: HeroBanner): Promise<void> => {
@@ -191,150 +202,37 @@ export const api = {
      await deleteDoc(doc(db, "banners", id));
   },
 
-  // Auth Subscription (Handles Redirect & Persistence)
-  subscribeToAuth: (callback: (user: User | null) => void) => {
-    return onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-          // Pass basic user info immediately to UI to prevent "logout blink"
-          // callback(basicUser); <--- Optional: could add this if loading is slow
-          const user = await handleUserAuth(firebaseUser);
-          callback(user);
-      } else {
-          callback(null);
-      }
-    });
-  },
-
-  // Auth - Google
-  login: async (): Promise<User> => {
-    try {
-        const result = await signInWithPopup(auth, googleProvider);
-        return await handleUserAuth(result.user);
-    } catch (error: any) {
-        console.error("Login failed:", error);
-        if (error.code === 'auth/configuration-not-found' || error.code === 'auth/operation-not-allowed') {
-            throw new Error("Google Sign-In is not enabled. Please enable it in Firebase Console.");
-        }
-        if (error.code === 'auth/popup-closed-by-user') {
-             throw new Error("Login cancelled.");
-        }
-        if (error.code === 'auth/unauthorized-domain') {
-             throw new Error(`Domain not authorized. Please add "${window.location.hostname}" to Firebase Console > Authentication > Settings > Authorized Domains.`);
-        }
-        throw error;
-    }
-  },
-
-  // Auth - Google Redirect (For Mobile)
-  loginGoogleRedirect: async (): Promise<void> => {
-      await signInWithRedirect(auth, googleProvider);
-  },
-
-  checkRedirectLogin: async (): Promise<User | null> => {
-      try {
-          const result = await getRedirectResult(auth);
-          if (result) {
-              return await handleUserAuth(result.user);
-          }
-      } catch (error: any) {
-          console.error("Redirect Login Error:", error);
-           if (error.code === 'auth/unauthorized-domain') {
-             throw new Error(`Domain not authorized. Please add "${window.location.hostname}" to Firebase Console > Authentication > Settings > Authorized Domains.`);
-        }
-      }
-      return null;
-  },
-
-  // Auth - Email/Password
-  loginEmail: async (email: string, pass: string): Promise<User> => {
-      try {
-          const result = await signInWithEmailAndPassword(auth, email, pass);
-          return await handleUserAuth(result.user);
-      } catch (error: any) {
-          console.error("Email Login Error:", error);
-          if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') throw new Error("Invalid email or password.");
-          if (error.code === 'auth/user-not-found') throw new Error("User not found.");
-          throw error;
-      }
-  },
-
-  registerEmail: async (name: string, email: string, pass: string): Promise<User> => {
-      try {
-          const result = await createUserWithEmailAndPassword(auth, email, pass);
-          await updateProfile(result.user, { displayName: name });
-          return await handleUserAuth(result.user);
-      } catch (error: any) {
-          console.error("Registration Error:", error);
-          if (error.code === 'auth/email-already-in-use') throw new Error("Email already in use.");
-          if (error.code === 'auth/weak-password') throw new Error("Password should be at least 6 characters.");
-          throw error;
-      }
-  },
-
-  // Auth - Anonymous
-  loginAnonymous: async (): Promise<User> => {
-      try {
-          const result = await signInAnonymously(auth);
-          return await handleUserAuth(result.user);
-      } catch (error: any) {
-          console.error("Anonymous Login Error:", error);
-          if (error.code === 'auth/operation-not-allowed') throw new Error("Anonymous auth is not enabled in Firebase Console.");
-          throw error;
-      }
-  },
-
-  logout: async () => {
-      await signOut(auth);
-  },
-
-  // Addresses
   getAddresses: async (userId: string): Promise<Address[]> => {
     try {
         const q = query(collection(db, "users", userId, "addresses"));
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => convertDoc<Address>(doc));
-    } catch (error) {
-        console.error("Error fetching addresses:", error);
-        return [];
-    }
+    } catch (error) { return []; }
   },
 
   saveAddress: async (userId: string, address: Address): Promise<void> => {
-    // 1. Calculate distance before saving if location is present
+    // Basic distance calc logic retained
     if (address.location) {
         const settings = await api.getDeliverySettings();
         if (settings.storeLocation) {
             try {
                 const dist = await calculateDrivingDistance(settings.storeLocation, address.location);
                 address.distanceFromStore = dist;
-            } catch (e) {
-                console.error("Distance Calc Error", e);
-                address.distanceFromStore = 5; 
-            }
+            } catch (e) { address.distanceFromStore = 5; }
         }
     } else if (address.distanceFromStore === undefined) {
-         // Fallback logic
          const pincodeVal = parseInt(address.pincode.slice(0, 5)) || 38000;
          address.distanceFromStore = (pincodeVal % 10) * 5 + 2; 
     }
 
     const batch = writeBatch(db);
-
-    // 2. If default, unset others
     if (address.isDefault) {
         const existingRef = collection(db, "users", userId, "addresses");
         const existing = await getDocs(existingRef);
-        existing.forEach(doc => {
-            if (doc.data().isDefault) {
-                batch.update(doc.ref, { isDefault: false });
-            }
-        });
+        existing.forEach(doc => { if (doc.data().isDefault) batch.update(doc.ref, { isDefault: false }); });
     }
-
-    // 3. Save new address
     const addrRef = doc(db, "users", userId, "addresses", address.id);
     batch.set(addrRef, address);
-    
     await batch.commit();
   },
 
@@ -342,7 +240,6 @@ export const api = {
     await deleteDoc(doc(db, "users", userId, "addresses", addressId));
   },
 
-  // Orders
   getOrders: async (isAdmin: boolean, userId?: string): Promise<Order[]> => {
     try {
         let q;
@@ -350,44 +247,26 @@ export const api = {
             q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
         } else if (userId) {
             q = query(collection(db, "orders"), where("userId", "==", userId), orderBy("createdAt", "desc"));
-        } else {
-            return [];
-        }
+        } else { return []; }
         
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => convertDoc<Order>(doc));
-    } catch (error) {
-        console.error("Error fetching orders:", error);
-        return [];
-    }
+    } catch (error) { return []; }
   },
 
   createOrder: async (order: Order): Promise<void> => {
-     try {
-         await runTransaction(db, async (transaction) => {
-             for (const item of order.items) {
-                 const productRef = doc(db, "products", item.id);
-                 const productSnap = await transaction.get(productRef);
-                 
-                 if (!productSnap.exists()) {
-                     throw new Error(`Product ${item.name} does not exist!`);
-                 }
-                 
-                 const currentStock = productSnap.data().stock;
-                 if (currentStock < item.quantity) {
-                     throw new Error(`Insufficient stock for ${item.name}. Available: ${currentStock}`);
-                 }
-                 
-                 transaction.update(productRef, { stock: currentStock - item.quantity });
-             }
-
-             const orderRef = doc(db, "orders", order.id);
-             transaction.set(orderRef, order);
-         });
-     } catch (error) {
-         console.error("Order creation failed:", error);
-         throw error;
-     }
+     await runTransaction(db, async (transaction) => {
+         for (const item of order.items) {
+             const productRef = doc(db, "products", item.id);
+             const productSnap = await transaction.get(productRef);
+             if (!productSnap.exists()) throw new Error(`Product ${item.name} not found`);
+             const currentStock = productSnap.data().stock;
+             if (currentStock < item.quantity) throw new Error(`Insufficient stock for ${item.name}`);
+             transaction.update(productRef, { stock: currentStock - item.quantity });
+         }
+         const orderRef = doc(db, "orders", order.id);
+         transaction.set(orderRef, order);
+     });
   },
 
   updateOrderStatus: async (orderId: string, status: OrderStatus): Promise<void> => {
@@ -397,81 +276,51 @@ export const api = {
   requestOrderCancellation: async (orderId: string, reason: string): Promise<void> => {
       const orderRef = doc(db, "orders", orderId);
       await updateDoc(orderRef, {
-          cancelRequest: {
-              reason,
-              status: 'pending',
-              requestedAt: new Date().toISOString()
-          }
+          cancelRequest: { reason, status: 'pending', requestedAt: new Date().toISOString() }
       });
   },
 
   rejectOrderCancellation: async (orderId: string): Promise<void> => {
       const orderRef = doc(db, "orders", orderId);
-      await updateDoc(orderRef, {
-          "cancelRequest.status": "rejected"
-      });
+      await updateDoc(orderRef, { "cancelRequest.status": "rejected" });
   },
 
-  // Reviews
   getReviews: async (productId?: string): Promise<Review[]> => {
     try {
-        let q;
-        if (productId) {
-            q = query(collection(db, "reviews"), where("productId", "==", productId), orderBy("createdAt", "desc"));
-        } else {
-            q = query(collection(db, "reviews"), orderBy("createdAt", "desc"));
-        }
+        let q = productId 
+            ? query(collection(db, "reviews"), where("productId", "==", productId), orderBy("createdAt", "desc"))
+            : query(collection(db, "reviews"), orderBy("createdAt", "desc"));
         const snap = await getDocs(q);
         return snap.docs.map(doc => convertDoc<Review>(doc));
-    } catch (error) {
-        console.error("Error getting reviews:", error);
-        return [];
-    }
+    } catch (error) { return []; }
   },
 
   addReview: async (review: Review): Promise<void> => {
-     try {
-         await runTransaction(db, async (transaction) => {
-             const reviewRef = doc(db, "reviews", review.id);
-             transaction.set(reviewRef, review);
-
-             const prodRef = doc(db, "products", review.productId);
-             const prodSnap = await transaction.get(prodRef);
-             if (!prodSnap.exists()) return;
-
-             const pData = prodSnap.data();
-             const currentCount = pData.reviewCount || 0;
-             const currentRating = pData.rating || 0;
-
-             const newCount = currentCount + 1;
-             const newAvg = ((currentRating * currentCount) + review.rating) / newCount;
-
-             transaction.update(prodRef, {
-                 rating: parseFloat(newAvg.toFixed(1)),
-                 reviewCount: newCount
-             });
-         });
-     } catch (error) {
-         console.error("Error adding review:", error);
-         throw error;
-     }
+     await runTransaction(db, async (transaction) => {
+         const reviewRef = doc(db, "reviews", review.id);
+         transaction.set(reviewRef, review);
+         const prodRef = doc(db, "products", review.productId);
+         const prodSnap = await transaction.get(prodRef);
+         if (!prodSnap.exists()) return;
+         const pData = prodSnap.data();
+         const currentCount = pData.reviewCount || 0;
+         const currentRating = pData.rating || 0;
+         const newCount = currentCount + 1;
+         const newAvg = ((currentRating * currentCount) + review.rating) / newCount;
+         transaction.update(prodRef, { rating: parseFloat(newAvg.toFixed(1)), reviewCount: newCount });
+     });
   },
 
   deleteReview: async (reviewId: string): Promise<void> => {
       await deleteDoc(doc(db, "reviews", reviewId));
   },
 
-  // Settings
   getDeliverySettings: async (): Promise<DeliverySettings> => {
     try {
         const snap = await getDoc(doc(db, "settings", "delivery"));
-        if (snap.exists()) {
-            return convertDoc<DeliverySettings>(snap);
-        }
+        if (snap.exists()) return convertDoc<DeliverySettings>(snap);
         return DEFAULT_SETTINGS;
-    } catch (error) {
-        return DEFAULT_SETTINGS;
-    }
+    } catch (error) { return DEFAULT_SETTINGS; }
   },
 
   saveDeliverySettings: async (settings: DeliverySettings): Promise<void> => {

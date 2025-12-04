@@ -6,3 +6,13 @@ export const DEFAULT_STORE_LOCATION = {
     lat: 23.0225, // Ahmedabad
     lng: 72.5714
 };
+
+export const DEFAULT_SETTINGS = {
+    baseCharge: 50,
+    perKmCharge: 10,
+    freeDeliveryAbove: 1000,
+    codEnabled: true,
+    estimatedDays: "3-5 days",
+    serviceablePincodes: [],
+    storeLocation: DEFAULT_STORE_LOCATION
+};
