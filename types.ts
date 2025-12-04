@@ -7,6 +7,7 @@ export interface User {
   isAdmin: boolean;
   phone?: string;
   isAnonymous?: boolean;
+  lastLogin?: string;
 }
 
 export interface Product {

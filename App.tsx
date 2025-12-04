@@ -1,10 +1,9 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { HashRouter, Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom';
-import { Home, ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, LogIn, Mail, Lock, UserPlus, Shield, X, Clock, ArrowRight, Loader, Smartphone, AlertCircle } from 'lucide-react';
-import { AppState, Address } from './types';
+import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
+import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone } from 'lucide-react';
 import { api } from './services/mockService';
-import { Logo, Button, AddressForm, Input } from './components/Shared';
+import { Logo, Button } from './components/Shared';
 import { HomePage, ProductDetailsPage, CartPage, CheckoutPage, ProfilePage } from './pages/UserPages';
 import { AdminDashboard, AdminProducts, AdminOrdersPage, AdminReviewsPage } from './pages/AdminPages';
 import { TermsPage, PrivacyPage } from './pages/InfoPages';
@@ -110,116 +109,44 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
     );
 };
 
-// --- Login Modal ---
-const LoginModal = ({ onClose }: { onClose: () => void }) => {
-    const { dispatch, pendingRedirect, setPendingRedirect } = useAppContext();
-    const navigate = useNavigate();
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-
-    const handleSuccess = (user: any) => {
-        dispatch({ type: 'SET_USER', payload: user });
-        onClose();
-        // Redirect to Dashboard (Profile) or Pending Route
-        if (pendingRedirect) {
-            navigate(pendingRedirect);
-            setPendingRedirect(null);
-        } else {
-            navigate('/profile');
-        }
-    };
-
-    const handleGoogleLogin = async () => {
-        setIsLoading(true);
-        setError('');
-        try {
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            if (isMobile) {
-                // Mobile: Redirect Flow
-                await api.loginGoogleRedirect();
-                // Redirect happens, code stops here
-            } else {
-                // Desktop: Popup Flow
-                const user = await api.loginGoogle();
-                handleSuccess(user);
-            }
-        } catch (e: any) {
-            console.error(e);
-            setError(e.message || "Login failed. Please try again.");
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-             <div className="bg-white dark:bg-gray-800 w-full max-w-sm p-8 rounded-2xl shadow-xl relative text-center" onClick={e => e.stopPropagation()}>
-                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
-                 
-                 <div className="bg-primary/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                     <UserIcon size={32} className="text-primary-dark" />
-                 </div>
-                 <h2 className="text-2xl font-bold dark:text-white mb-2">Welcome Back</h2>
-                 <p className="text-gray-500 text-sm mb-6">Login to access your dashboard and orders.</p>
-
-                 {error && (
-                     <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 flex items-start gap-2 text-left">
-                         <AlertCircle size={16} className="shrink-0 mt-0.5" /> 
-                         <span>{error}</span>
-                     </div>
-                 )}
-
-                 <Button 
-                    onClick={handleGoogleLogin} 
-                    isLoading={isLoading} 
-                    className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 shadow-sm py-3"
-                 >
-                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-                     Login with Google
-                 </Button>
-
-                 <p className="text-xs text-gray-400 mt-6">
-                     By continuing, you agree to our Terms & Privacy Policy.
-                 </p>
-             </div>
-        </div>
-    );
-};
-
 // --- Main App Content ---
 const AppContent = () => {
-    const { state, dispatch, showLoginModal, setShowLoginModal } = useAppContext();
+    const { state, dispatch } = useAppContext();
     const navigate = useNavigate();
+    const location = useLocation();
     const [showSearch, setShowSearch] = useState(false);
-    const [authLoading, setAuthLoading] = useState(true);
+    const [initLoading, setInitLoading] = useState(true);
 
     const isAdmin = state.user?.isAdmin;
     const isAdminRoute = location.pathname.startsWith('/admin');
     
     useEffect(() => {
-        // 1. Check for Redirect Login Result (Mobile)
-        api.checkRedirectLogin().then(user => {
-            if (user) {
+        // Initialize Guest Session
+        const init = async () => {
+            try {
+                const user = await api.initializeSession();
                 dispatch({ type: 'SET_USER', payload: user });
-                navigate('/profile');
+                // Load user data
+                if (user) {
+                    const addrs = await api.getAddresses(user.id);
+                    dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setInitLoading(false);
             }
-        });
-
-        // 2. Auth State Listener (Persistence)
-        const unsubscribe = api.subscribeToAuth((user) => {
-            dispatch({ type: 'SET_USER', payload: user });
-            setAuthLoading(false);
-        });
-
-        return () => unsubscribe();
+        };
+        init();
     }, []);
 
     const cartCount = state.cart.reduce((acc, item) => acc + item.quantity, 0);
 
-    if (authLoading) {
+    if (initLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900 flex-col gap-4">
                 <Loader className="animate-spin text-primary w-10 h-10" />
-                <p className="text-gray-500 text-sm">Loading your account...</p>
+                <p className="text-gray-500 text-sm">Loading store...</p>
             </div>
         );
     }
@@ -227,7 +154,6 @@ const AppContent = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
             {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
-            {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
 
             {/* Header */}
             <header className="sticky top-0 z-40 bg-white dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800 shadow-sm transition-all">
@@ -255,22 +181,16 @@ const AppContent = () => {
                             )}
                         </Link>
 
-                        {state.user ? (
-                            <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
-                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-gray-200">
-                                    {state.user.photoURL ? <img src={state.user.photoURL} className="w-full h-full object-cover"/> : <span className="font-bold text-xs">{state.user.name[0]}</span>}
-                                </div>
-                                <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user.name.split(' ')[0]}</span>
-                            </Link>
-                        ) : (
-                            <Button size="sm" onClick={() => setShowLoginModal(true)} className="flex px-4 py-2 rounded-full text-xs md:text-sm shadow-md">
-                                Login
-                            </Button>
-                        )}
+                        <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-gray-200">
+                                <UserIcon size={20} className="text-primary-dark" />
+                            </div>
+                            <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user?.name || "Guest"}</span>
+                        </Link>
                     </div>
                 </div>
                 
-                {state.user && state.addresses.length > 0 && (
+                {state.addresses.length > 0 && (
                     <div className="bg-primary/10 dark:bg-gray-800 py-1.5 px-4 text-xs flex justify-center md:justify-start gap-2 items-center text-gray-600 dark:text-gray-300 border-b dark:border-gray-800">
                         <Smartphone size={12} className="text-primary-dark"/>
                         <span>Delivering to: <b>{state.addresses.find(a => a.isDefault)?.pincode || state.addresses[0].pincode}</b></span>

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useReducer, useState, ReactNode, PropsWithChildren } from 'react';
 import { AppState, Product, User, DeliverySettings, HeroBanner, Address, CartItem } from './types';
 import { DEFAULT_STORE_LOCATION } from './constants';
@@ -93,8 +94,7 @@ export const reducer = (state: AppState, action: Action): AppState => {
 const AppContext = createContext<{ 
   state: AppState; 
   dispatch: React.Dispatch<Action>;
-  showLoginModal: boolean;
-  setShowLoginModal: (show: boolean) => void;
+  setShowLoginModal: (show: boolean) => void; // Kept as no-op to prevent breakages in other files if any
   pendingRedirect: string | null;
   setPendingRedirect: (path: string | null) => void;
 } | null>(null);
@@ -107,14 +107,15 @@ export const useAppContext = () => {
 
 export const AppProvider = ({ children }: PropsWithChildren) => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
+
+  // No-op function for compatibility
+  const setShowLoginModal = (show: boolean) => {};
 
   return (
     <AppContext.Provider value={{ 
       state, 
       dispatch, 
-      showLoginModal, 
       setShowLoginModal,
       pendingRedirect,
       setPendingRedirect

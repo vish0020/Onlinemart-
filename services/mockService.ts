@@ -14,23 +14,12 @@ import {
     Timestamp,
     writeBatch
 } from "firebase/firestore";
-import { 
-    signInWithPopup, 
-    signInWithRedirect,
-    getRedirectResult,
-    signOut, 
-    onAuthStateChanged,
-    User as FirebaseUser,
-    AuthError
-} from "firebase/auth";
-import { db, auth, googleProvider } from "../firebase";
+import { db } from "../firebase";
 import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address } from '../types';
 import { calculateDrivingDistance } from './mapService';
 import { DEFAULT_STORE_LOCATION, DEFAULT_SETTINGS } from '../constants';
 
 // --- Configuration ---
-const ADMIN_EMAIL = "onlinemart0020@gmail.com";
-
 export const PRODUCT_CATEGORIES: Record<string, string[]> = {
   "Electronics": ["Mobiles", "Mobile Accessories", "Laptops", "Smartwatches", "Headphones", "Speakers"],
   "Fashion": ["Men", "Women", "Kids", "Watches", "Shoes"],
@@ -63,136 +52,55 @@ const convertDoc = <T>(docSnap: any): T => {
     return { id: docSnap.id, ...data } as T;
 };
 
-// --- 4. Core User Logic (The Rebuilt Auth Handler) ---
-const handleUserAuth = async (firebaseUser: FirebaseUser): Promise<User> => {
-    if (!firebaseUser) throw new Error("No firebase user found");
-
-    const uid = firebaseUser.uid;
-    const userRef = doc(db, "users", uid);
-    const now = new Date().toISOString();
-
-    // 1. Identify Admin
-    const isAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
-    // 2. Prepare Base User Data
-    const baseUserData = {
-        uid: uid,
-        name: firebaseUser.displayName || "User",
-        email: firebaseUser.email || "",
-        photoURL: firebaseUser.photoURL || "",
-        isAdmin: isAdmin,
-        lastLogin: now
-    };
-
-    try {
-        const userSnap = await getDoc(userRef);
-
-        if (userSnap.exists()) {
-            // Update existing user: Update lastLogin and potentially photo/name if changed
-            await updateDoc(userRef, {
-                lastLogin: now,
-                name: baseUserData.name,
-                photoURL: baseUserData.photoURL,
-                isAdmin: isAdmin // Ensure admin status is synced
-            });
-            // Return combined data (DB data takes priority for app-specific fields like 'phone')
-            return { ...convertDoc<User>(userSnap), ...baseUserData }; 
-        } else {
-            // Create new user document
-            const newUser = {
-                ...baseUserData,
-                id: uid,
-                createdAt: now
-            };
-            await setDoc(userRef, newUser);
-            return newUser;
-        }
-    } catch (error) {
-        console.error("Firestore User Sync Error (Offline?):", error);
-        // Fallback: If Firestore fails (e.g. offline), return the Auth data so the user can still 'login' in UI
-        return {
-            id: uid,
-            ...baseUserData
-        };
-    }
-};
-
 export const api = {
-  // --- 7. Helper: Get Current User ---
-  getCurrentUser: () => {
-      return auth.currentUser;
-  },
-
-  // --- Auth: Subscribe (Listener) ---
-  subscribeToAuth: (callback: (user: User | null) => void) => {
-    return onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-          try {
-              const user = await handleUserAuth(firebaseUser);
-              callback(user);
-          } catch (e) {
-              console.error("Auth State Change Error:", e);
-              // Fallback to basic auth if sync fails
-              callback({
-                  id: firebaseUser.uid,
-                  name: firebaseUser.displayName || 'User',
-                  email: firebaseUser.email || '',
-                  photoURL: firebaseUser.photoURL || '',
-                  isAdmin: firebaseUser.email === ADMIN_EMAIL,
-                  isAnonymous: false
-              });
-          }
-      } else {
-          callback(null);
+  
+  // --- SESSION: Initialize Guest/Persistent User ---
+  initializeSession: async (): Promise<User> => {
+      let uid = localStorage.getItem('om_uid');
+      if (!uid) {
+          uid = 'user_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('om_uid', uid);
       }
-    });
-  },
 
-  // --- Auth: Google Popup (Desktop) ---
-  loginGoogle: async (): Promise<User> => {
-    try {
-        const result = await signInWithPopup(auth, googleProvider);
-        return await handleUserAuth(result.user);
-    } catch (error: any) {
-        const authError = error as AuthError;
-        console.error("Google Login Error:", authError.code, authError.message);
-        
-        // Throw a user-friendly error message
-        if (authError.code === 'auth/popup-blocked') {
-            throw new Error("Popup blocked. Please allow popups for this site.");
-        } else if (authError.code === 'auth/popup-closed-by-user') {
-            throw new Error("Login cancelled by user.");
-        } else if (authError.code === 'auth/unauthorized-domain') {
-            throw new Error("Domain not authorized. Add to Firebase Console.");
-        } else if (authError.code === 'auth/cancelled-popup-request') {
-             throw new Error("Only one popup allowed at a time.");
-        }
-        
-        throw new Error(authError.message || "Login failed.");
-    }
-  },
-
-  // --- Auth: Google Redirect (Mobile) ---
-  loginGoogleRedirect: async (): Promise<void> => {
-      await signInWithRedirect(auth, googleProvider);
-  },
-
-  // --- Auth: Check Redirect Result (Mobile) ---
-  checkRedirectLogin: async (): Promise<User | null> => {
+      const userRef = doc(db, "users", uid);
+      
       try {
-          const result = await getRedirectResult(auth);
-          if (result) {
-              return await handleUserAuth(result.user);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+              const userData = convertDoc<User>(userSnap);
+              // Update last seen
+              updateDoc(userRef, { lastLogin: new Date().toISOString() }).catch(console.error);
+              return userData;
+          } else {
+              // Create new Guest User
+              const newUser: User = {
+                  id: uid,
+                  name: "Guest User",
+                  email: "guest@onlinemart.com",
+                  photoURL: "", // No photo
+                  isAdmin: false,
+                  lastLogin: new Date().toISOString()
+              };
+              await setDoc(userRef, newUser);
+              return newUser;
           }
-      } catch (error) {
-          console.error("Redirect Result Error:", error);
+      } catch (e) {
+          console.error("Error init session:", e);
+          // Fallback offline user
+           return {
+              id: uid,
+              name: "Guest User (Offline)",
+              email: "guest@offline.com",
+              isAdmin: false,
+              isAnonymous: true
+          } as User;
       }
-      return null;
   },
 
-  // --- Auth: Logout ---
-  logout: async () => {
-      await signOut(auth);
+  // --- Update User Profile (Name/Admin Status) ---
+  updateUserProfile: async (userId: string, data: Partial<User>): Promise<void> => {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, data);
   },
 
   // ---------------------------------------------------------

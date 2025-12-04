@@ -1,6 +1,5 @@
 
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 // --- 1. Firebase Configuration ---
@@ -18,21 +17,7 @@ const firebaseConfig = {
 // --- 2. Initialize App ---
 const app = initializeApp(firebaseConfig);
 
-// --- 3. Initialize Auth & Persistence ---
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-
-// Configure Google Provider Custom Parameters
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
-
-// Force persistence to LOCAL (survives refresh and browser restart)
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.error("Auth Persistence Error:", error);
-});
-
-// --- 4. Initialize Firestore & Offline Support ---
+// --- 3. Initialize Firestore & Offline Support ---
 export const db = getFirestore(app);
 
 // Enable offline persistence for Firestore

@@ -6,10 +6,10 @@ import {
   CheckCircle, Search, Mic, Loader, Moon, Sun, 
   Smartphone, Shirt, Home, Sparkles, Gamepad2, Gift, 
   ShoppingBasket, Wrench, Dumbbell, BookOpen, Zap, 
-  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard
+  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck
 } from 'lucide-react';
 import { Product, CartItem, Order, DeliverySettings, Review, Address } from '../types';
-import { Button, Input, ProductCard, Skeleton, ProductSkeleton, AddressForm } from '../components/Shared';
+import { Button, Input, ProductCard, Skeleton, ProductSkeleton, AddressForm, Logo } from '../components/Shared';
 import { api, PRODUCT_CATEGORIES } from '../services/mockService';
 import { useAppContext } from '../Context';
 
@@ -355,7 +355,7 @@ const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { orde
 };
 
 export const HomePage = () => {
-    const { state, dispatch, setShowLoginModal } = useAppContext();
+    const { state, dispatch } = useAppContext();
     const [loading, setLoading] = useState(true);
     const [recentItems, setRecentItems] = useState<Product[]>([]);
     const [showReviewPopup, setShowReviewPopup] = useState(false);
@@ -482,7 +482,6 @@ export const HomePage = () => {
           dispatch({ type: 'SET_SEARCH', payload: '' });
       } else {
           dispatch({ type: 'SET_SEARCH', payload: cat });
-          // Ensure we are in a state to see results if we were searching
       }
     };
   
@@ -497,10 +496,6 @@ export const HomePage = () => {
     };
 
     const handleToggleWishlist = (id: string) => {
-        if (!state.user) {
-            setShowLoginModal(true);
-            return;
-        }
         dispatch({ type: 'TOGGLE_WISHLIST', payload: id });
     };
   
@@ -705,7 +700,7 @@ export const HomePage = () => {
 export const ProductDetailsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { state, dispatch, setShowLoginModal } = useAppContext();
+    const { state, dispatch } = useAppContext();
     const product = state.products.find(p => p.id === id);
     const [activeImg, setActiveImg] = useState(0);
     const [reviews, setReviews] = useState<Review[]>([]);
@@ -761,28 +756,12 @@ export const ProductDetailsPage = () => {
         }
     };
 
-    const handleSuggestionClick = (p: Product) => {
-        const recentJSON = localStorage.getItem('om_recent');
-        let recent: Product[] = recentJSON ? JSON.parse(recentJSON) : [];
-        recent = recent.filter(prod => prod.id !== p.id);
-        recent.unshift(p);
-        recent = recent.slice(0, 10);
-        localStorage.setItem('om_recent', JSON.stringify(recent));
-        navigate(`/product/${p.id}`);
-        setScale(1);
-    };
-
     const handleToggleWishlist = (id: string) => {
-        if (!state.user) {
-            setShowLoginModal(true);
-            return;
-        }
         dispatch({ type: 'TOGGLE_WISHLIST', payload: id });
     };
   
     const handleSubmitReview = async (reviewData: any) => {
       if (!state.user || !product) {
-          setShowLoginModal(true);
           return;
       }
       const review: Review = {
@@ -806,29 +785,6 @@ export const ProductDetailsPage = () => {
       dispatch({ type: 'SET_PRODUCTS', payload: prods });
     };
 
-    const similarProducts = useMemo(() => {
-        if (!product) return [];
-        const similar = state.products.filter(p => p.id !== product.id && p.category === product.category);
-        return generateRepeatedList(similar);
-    }, [product, state.products]);
-
-    const recentAddedProducts = useMemo(() => {
-         const recent = [...state.products].reverse();
-         return generateRepeatedList(recent);
-    }, [state.products]);
-
-    const recommendedProducts = useMemo(() => {
-        const recommended = state.products.filter(p => p.rating >= 4.5 || p.isFeatured);
-        return generateRepeatedList(recommended);
-    }, [state.products]);
-
-    const recentlyViewed = useMemo(() => {
-        const json = localStorage.getItem('om_recent');
-        const list: Product[] = json ? JSON.parse(json) : [];
-        const filtered = list.filter(p => p.id !== product?.id);
-        return generateRepeatedList(filtered);
-    }, [product]);
-  
     const ratingsCount = useMemo(() => {
         const counts = {1:0, 2:0, 3:0, 4:0, 5:0};
         reviews.forEach(r => counts[r.rating as keyof typeof counts]++);
@@ -907,10 +863,6 @@ export const ProductDetailsPage = () => {
     }
 
     const handleBuyNow = () => {
-        if (!state.user) {
-            setShowLoginModal(true);
-            return;
-        }
         if (product) {
             dispatch({ type: 'ADD_TO_CART', payload: product });
             navigate('/checkout');
@@ -1131,655 +1083,476 @@ export const ProductDetailsPage = () => {
               </div>
 
               {sortedReviews.length === 0 ? <p className="text-center text-gray-500 py-4">No reviews yet.</p> : sortedReviews.map(review => (
-                  <div key={review.id} className="pb-4 border-b dark:border-gray-800 last:border-0">
+                  <div key={review.id} className="pb-4 border-b dark:border-gray-700 last:border-0">
                       <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold overflow-hidden">
-                              {review.userPhoto ? <img src={review.userPhoto} className="w-full h-full object-cover"/> : review.userName[0]}
+                          <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold">
+                              {review.userName[0]}
                           </div>
-                          <p className="text-sm font-medium dark:text-white">{review.userName}</p>
+                          <span className="text-sm font-semibold dark:text-white">{review.userName}</span>
+                          {review.verifiedPurchase && <span className="text-[10px] text-green-600 font-bold ml-1">Verified Purchase</span>}
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
-                          <div className="flex text-yellow-400">
-                              {Array(5).fill(0).map((_, i) => <Star key={i} size={12} fill={i < review.rating ? "currentColor" : "none"} />)}
-                          </div>
-                          {review.verifiedPurchase && <span className="text-xs text-orange-600 font-bold">Verified Purchase</span>}
+                      <div className="flex text-yellow-400 mb-1">
+                          {Array(5).fill(0).map((_, i) => <Star key={i} size={12} fill={i < review.rating ? "currentColor" : "none"} />)}
                       </div>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{review.comment}</p>
-                      <p className="text-xs text-gray-400 mt-2">{new Date(review.createdAt).toDateString()}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{review.comment}</p>
                   </div>
               ))}
           </div>
-        </div>
-
-        <div className="space-y-6 mt-6 border-t-[8px] border-gray-100 dark:border-gray-800 pt-6">
-            {similarProducts.length > 0 && (
-                <div>
-                    <SectionHeader title="Similar Products" />
-                    <HorizontalProductList 
-                        products={similarProducts}
-                        onProductClick={handleSuggestionClick}
-                        onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
-                        wishlist={state.wishlist}
-                        onToggleWishlist={handleToggleWishlist}
-                    />
-                </div>
-            )}
-            
-            {recentAddedProducts.length > 0 && (
-                <div>
-                    <SectionHeader title="Fresh Arrivals" />
-                    <HorizontalProductList 
-                        products={recentAddedProducts}
-                        onProductClick={handleSuggestionClick}
-                        onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
-                        wishlist={state.wishlist}
-                        onToggleWishlist={handleToggleWishlist}
-                    />
-                </div>
-            )}
-
-            {recommendedProducts.length > 0 && (
-                <div>
-                    <SectionHeader title="Recommended for You" />
-                    <HorizontalProductList 
-                        products={recommendedProducts}
-                        onProductClick={handleSuggestionClick}
-                        onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
-                        wishlist={state.wishlist}
-                        onToggleWishlist={handleToggleWishlist}
-                    />
-                </div>
-            )}
-
-            {recentlyViewed.length > 0 && (
-                <div className="bg-gray-50 dark:bg-gray-800/50 py-4">
-                    <SectionHeader title="Your Browsing History" />
-                    <HorizontalProductList 
-                        products={recentlyViewed}
-                        onProductClick={handleSuggestionClick}
-                        onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
-                        wishlist={state.wishlist}
-                        onToggleWishlist={handleToggleWishlist}
-                    />
-                </div>
-            )}
         </div>
       </div>
     );
 };
 
 export const CartPage = () => {
-  const { state, dispatch, setShowLoginModal, setPendingRedirect } = useAppContext();
-  const navigate = useNavigate();
+    const { state, dispatch } = useAppContext();
+    const navigate = useNavigate();
 
-  const total = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const deliverySettings = state.deliverySettings;
-  const isFreeDelivery = total >= deliverySettings.freeDeliveryAbove;
-  
-  const defaultAddress = state.addresses.find(a => a.isDefault);
+    const subtotal = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const settings = state.deliverySettings;
+    const isFree = subtotal >= settings.freeDeliveryAbove;
+    const shipping = isFree ? 0 : settings.baseCharge;
+    const total = subtotal + shipping;
 
-  if (state.cart.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
-        <ShoppingBag className="w-20 h-20 text-gray-300" />
-        <h2 className="text-xl font-semibold dark:text-white">Your cart is empty</h2>
-        <Button onClick={() => navigate('/')}>Start Shopping</Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 pb-20 space-y-4 animate-slide-up">
-      {state.user && defaultAddress && (
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
-             <MapPin size={16} />
-             <div className="flex-1 truncate">
-                Deliver to <b>{defaultAddress.fullName}</b> - {defaultAddress.pincode}
-             </div>
-             <button onClick={() => navigate('/profile')} className="font-bold text-xs uppercase tracking-wide border border-blue-200 rounded px-2 py-1">Change</button>
-          </div>
-      )}
-
-      <h1 className="text-2xl font-bold dark:text-white">My Cart ({state.cart.length})</h1>
-      
-      <div className="space-y-4">
-        {state.cart.map(item => (
-          <div key={item.id} className="flex gap-4 bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm">
-            <img 
-                src={item.images?.[0] || 'https://via.placeholder.com/80'} 
-                className="w-20 h-20 object-cover rounded-lg bg-gray-100 cursor-pointer" 
-                alt={item.name}
-                onClick={() => navigate(`/product/${item.id}`)}
-            />
-            <div className="flex-1 flex flex-col justify-between">
-              <div onClick={() => navigate(`/product/${item.id}`)} className="cursor-pointer">
-                <h3 className="font-semibold line-clamp-1 dark:text-white">{item.name}</h3>
-                <p className="text-sm text-gray-500">{item.category}</p>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-bold dark:text-primary">₹{item.price * item.quantity}</span>
-                <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-700 rounded-lg px-2 py-1">
-                  <button onClick={() => dispatch({type: 'UPDATE_CART_QTY', payload: {id: item.id, delta: -1}})}><span className="font-bold">-</span></button>
-                  <span className="text-sm font-semibold w-4 text-center">{item.quantity}</span>
-                  <button onClick={() => dispatch({type: 'UPDATE_CART_QTY', payload: {id: item.id, delta: 1}})}><span className="font-bold text-primary">+</span></button>
-                </div>
-              </div>
+    if (state.cart.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 animate-fade-in">
+                <ShoppingBag size={80} className="text-gray-200 mb-6" strokeWidth={1}/>
+                <h2 className="text-xl font-bold dark:text-white mb-2">Your cart is empty</h2>
+                <p className="text-gray-500 mb-8 text-center">Looks like you haven't added anything to your cart yet.</p>
+                <Button onClick={() => navigate('/')}>Start Shopping</Button>
             </div>
-          </div>
-        ))}
-      </div>
+        );
+    }
 
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl space-y-3 text-sm">
-        <h3 className="font-bold text-gray-500 uppercase tracking-wider text-xs">Bill Details</h3>
-        <div className="flex justify-between dark:text-gray-300">
-          <span>Item Total</span>
-          <span>₹{total}</span>
-        </div>
-        <div className="flex justify-between dark:text-gray-300">
-          <span>Delivery Charge</span>
-          <span className={isFreeDelivery ? 'text-green-500' : ''}>
-            {isFreeDelivery ? 'FREE' : `calculated at checkout`}
-          </span>
-        </div>
-        <div className="border-t dark:border-gray-700 pt-3 flex justify-between font-bold text-lg dark:text-white">
-          <span>Subtotal</span>
-          <span>₹{total}</span>
-        </div>
-      </div>
+    return (
+        <div className="p-4 pb-24 max-w-2xl mx-auto animate-fade-in">
+            <h1 className="text-2xl font-bold mb-6 dark:text-white">Shopping Cart</h1>
+            
+            <div className="space-y-4 mb-8">
+                {state.cart.map(item => (
+                    <div key={item.id} className="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <img src={item.images[0]} alt={item.name} className="w-20 h-20 object-cover rounded-lg bg-gray-100" />
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-sm dark:text-white line-clamp-2 mb-1">{item.name}</h3>
+                            <p className="font-bold text-lg dark:text-white mb-2">₹{item.price}</p>
+                            
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-700 rounded-lg px-2 py-1">
+                                    <button 
+                                        onClick={() => dispatch({type: 'UPDATE_CART_QTY', payload: {id: item.id, delta: -1}})}
+                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                    >
+                                        <Minus size={14} />
+                                    </button>
+                                    <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
+                                    <button 
+                                        onClick={() => dispatch({type: 'UPDATE_CART_QTY', payload: {id: item.id, delta: 1}})}
+                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                </div>
+                                <button 
+                                    onClick={() => dispatch({type: 'UPDATE_CART_QTY', payload: {id: item.id, delta: -item.quantity}})}
+                                    className="text-red-500 text-xs font-semibold"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
-      <div className="flex justify-end pt-4">
-         {/* Button removed from here and placed below */}
-      </div>
+            <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-3">
+                <div className="flex justify-between text-gray-600 dark:text-gray-300 text-sm">
+                    <span>Subtotal</span>
+                    <span>₹{subtotal}</span>
+                </div>
+                <div className="flex justify-between text-gray-600 dark:text-gray-300 text-sm">
+                    <span>Delivery Charges</span>
+                    <span className={isFree ? 'text-green-600 font-bold' : ''}>
+                        {isFree ? 'FREE' : `₹${shipping}`}
+                    </span>
+                </div>
+                {!isFree && (
+                     <p className="text-xs text-gray-400">Add items worth ₹{settings.freeDeliveryAbove - subtotal} more for free delivery.</p>
+                )}
+                <div className="border-t dark:border-gray-700 pt-3 flex justify-between font-bold text-lg dark:text-white">
+                    <span>Total Amount</span>
+                    <span>₹{total}</span>
+                </div>
+            </div>
 
-      <div className="pt-4 pb-4">
-          <Button 
-              className="w-full shadow-lg" 
-              onClick={() => {
-                  if (state.user) {
-                      navigate('/checkout');
-                  } else {
-                      setPendingRedirect('/checkout');
-                      setShowLoginModal(true);
-                  }
-              }}
-          >
-            Proceed to Buy ({state.cart.length} items)
-          </Button>
-      </div>
-    </div>
-  );
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800">
+                <div className="max-w-2xl mx-auto flex gap-4 items-center">
+                    <div className="flex-1">
+                        <p className="text-xs text-gray-500">Total</p>
+                        <p className="font-bold text-xl dark:text-white">₹{total}</p>
+                    </div>
+                    <Button onClick={() => navigate('/checkout')} className="flex-1 py-3 text-base">Proceed to Buy</Button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export const CheckoutPage = () => {
-  const { state, dispatch } = useAppContext();
-  const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [deliveryCost, setDeliveryCost] = useState(0);
-  const [deliveryDistance, setDeliveryDistance] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'Online'>('COD');
-  
-  const [selectedAddressId, setSelectedAddressId] = useState<string>(
-      state.addresses.find(a => a.isDefault)?.id || ''
-  );
-  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+    const { state, dispatch } = useAppContext();
+    const navigate = useNavigate();
+    const [step, setStep] = useState(1); // 1: Address, 2: Payment
+    const [selectedAddrId, setSelectedAddrId] = useState<string>('');
+    const [showAddrForm, setShowAddrForm] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-  const selectedAddress = state.addresses.find(a => a.id === selectedAddressId);
+    useEffect(() => {
+        if (state.cart.length === 0) navigate('/cart');
+        const defaultAddr = state.addresses.find(a => a.isDefault);
+        if (defaultAddr) setSelectedAddrId(defaultAddr.id);
+        else if (state.addresses.length > 0) setSelectedAddrId(state.addresses[0].id);
+    }, [state.addresses]);
 
-  useEffect(() => {
-    if (state.addresses.length === 0) {
-        setIsAddingNewAddress(true);
-    }
-  }, [state.addresses]);
-
-  useEffect(() => {
-    if (selectedAddress) {
-        setLoading(true);
-        setTimeout(() => {
-            const settings = state.deliverySettings;
-            let distance = 0;
-
-            if (selectedAddress.distanceFromStore !== undefined) {
-                distance = selectedAddress.distanceFromStore;
-            } else {
-                // Fallback for old addresses
-                const pincodeVal = parseInt(selectedAddress.pincode.slice(0, 5)) || 38000;
-                distance = (pincodeVal % 10) * 5 + 2; 
-            }
-
-            const cost = settings.baseCharge + (distance * settings.perKmCharge);
-            const cartTotal = state.cart.reduce((a,b) => a + (b.price * b.quantity), 0);
-            
-            setDeliveryDistance(distance);
-
-            if (cartTotal >= settings.freeDeliveryAbove) {
-                setDeliveryCost(0);
-            } else {
-                setDeliveryCost(Math.round(cost));
-            }
-            setLoading(false);
-        }, 300);
-    }
-  }, [selectedAddress, state.deliverySettings, state.cart]);
-
-  const handleSaveNewAddress = async (newAddr: Address) => {
-    if (state.user) {
-        const addr = { ...newAddr, id: 'addr_' + Date.now() };
-        await api.saveAddress(state.user.id, addr);
-        const updated = await api.getAddresses(state.user.id);
-        dispatch({ type: 'SET_ADDRESSES', payload: updated });
-        setSelectedAddressId(addr.id);
-        setIsAddingNewAddress(false);
-    }
-  };
-
-  const placeOrder = async () => {
-    if (!state.user) return alert("Please login");
-    if (!selectedAddress) return alert("Select an address");
-
-    setLoading(true);
-    const cartTotal = state.cart.reduce((a,b) => a + (b.price * b.quantity), 0);
-    const order: Order = {
-      id: 'ord_' + Date.now(),
-      userId: state.user.id,
-      items: [...state.cart],
-      totalAmount: cartTotal + deliveryCost,
-      deliveryCharge: deliveryCost,
-      status: 'Ordered',
-      createdAt: new Date().toISOString(),
-      shippingAddress: selectedAddress,
-      paymentMethod: paymentMethod // Uses state
+    const handleSaveAddress = async (addr: Address) => {
+        if (!state.user) return;
+        const newAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
+        await api.saveAddress(state.user.id, newAddr);
+        const addrs = await api.getAddresses(state.user.id);
+        dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+        setSelectedAddrId(newAddr.id);
+        setShowAddrForm(false);
     };
 
-    await api.createOrder(order);
-    dispatch({ type: 'CLEAR_CART' });
-    setLoading(false);
-    navigate('/profile'); 
-  };
+    const handlePlaceOrder = async () => {
+        if (!state.user) return;
+        const address = state.addresses.find(a => a.id === selectedAddrId);
+        if (!address) return alert("Please select a delivery address");
 
-  return (
-    <div className="p-4 space-y-6 pb-20">
-      <h1 className="text-2xl font-bold dark:text-white">Checkout</h1>
-      
-      <div className="flex items-center justify-between mb-8 relative">
-        <div className="absolute top-1/2 w-full h-1 bg-gray-200 dark:bg-gray-700 -z-10"></div>
-        {[1, 2, 3].map(s => (
-          <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors ${step >= s ? 'bg-primary text-black' : 'bg-gray-200 text-gray-500'}`}>
-            {s}
-          </div>
-        ))}
-      </div>
+        setLoading(true);
+        const subtotal = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        const settings = state.deliverySettings;
+        
+        // Calculate dynamic delivery based on distance if available
+        let deliveryCharge = settings.baseCharge;
+        if (subtotal < settings.freeDeliveryAbove) {
+            if (address.distanceFromStore) {
+                deliveryCharge += (Math.ceil(address.distanceFromStore) * settings.perKmCharge);
+            }
+        } else {
+            deliveryCharge = 0;
+        }
+        
+        const total = subtotal + deliveryCharge;
 
-      {step === 1 && (
-        <div className="space-y-4 animate-fade-in">
-          <h2 className="text-xl font-semibold dark:text-white flex items-center gap-2"><MapPin size={20}/> Shipping Address</h2>
-          
-          {isAddingNewAddress ? (
-             <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700">
+        const order: Order = {
+            id: 'ord_' + Date.now(),
+            userId: state.user.id,
+            items: state.cart,
+            totalAmount: total,
+            deliveryCharge: deliveryCharge,
+            status: 'Ordered',
+            createdAt: new Date().toISOString(),
+            shippingAddress: address,
+            paymentMethod: 'COD' // Default for now
+        };
+
+        try {
+            await api.createOrder(order);
+            dispatch({ type: 'CLEAR_CART' });
+            navigate('/profile', { state: { newOrder: true } });
+        } catch (error) {
+            alert("Failed to place order. Try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (showAddrForm) {
+        return (
+            <div className="p-4 animate-fade-in">
                 <AddressForm 
-                    onSave={handleSaveNewAddress} 
-                    onCancel={() => {
-                        if (state.addresses.length > 0) {
-                            setIsAddingNewAddress(false);
-                        } else {
-                            // If no addresses exist and user cancels, go back to cart/product
-                            navigate(-1);
-                        }
-                    }} 
+                   onSave={handleSaveAddress} 
+                   onCancel={() => setShowAddrForm(false)} 
+                   initialData={null}
                 />
-             </div>
-          ) : (
-             <div className="space-y-3">
-                 {state.addresses.map(addr => (
-                     <div 
-                        key={addr.id} 
-                        onClick={() => setSelectedAddressId(addr.id)}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAddressId === addr.id ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
-                     >
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedAddressId === addr.id ? 'border-primary' : 'border-gray-400'}`}>
-                                {selectedAddressId === addr.id && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                            </div>
-                            <span className="font-bold dark:text-white">{addr.fullName}</span>
-                            <span className="bg-gray-100 dark:bg-gray-700 text-xs px-2 py-0.5 rounded">{addr.country}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 ml-7">
-                            {addr.line1}, {addr.area} <br/>
-                            {addr.city}, {addr.state} - {addr.pincode}
-                        </p>
-                        <p className="text-sm font-medium ml-7 mt-1">Phone: {addr.phone}</p>
-                     </div>
-                 ))}
-
-                 <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAddingNewAddress(true)}>
-                    <Plus size={16} /> Add New Address
-                 </Button>
-             </div>
-          )}
-          
-          {selectedAddress && !isAddingNewAddress && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg flex flex-col gap-2 text-sm text-blue-700 dark:text-blue-300 animate-fade-in">
-              <div className="flex items-center gap-2">
-                  {loading ? <Loader className="animate-spin w-4 h-4"/> : <Truck className="w-4 h-4" />}
-                  <span className="font-bold">
-                      {loading ? "Calculating delivery..." : deliveryCost === 0 ? "Eligible for Free Delivery!" : `Delivery Charge: ₹${deliveryCost}`}
-                  </span>
-              </div>
-              {!loading && deliveryCost > 0 && (
-                  <div className="text-xs ml-6 opacity-80 border-l-2 border-blue-200 dark:border-blue-800 pl-2">
-                      <p>Distance from Store: {deliveryDistance} km</p>
-                      <p>Formula: Base (₹{state.deliverySettings.baseCharge}) + {deliveryDistance}km × ₹{state.deliverySettings.perKmCharge}/km</p>
-                  </div>
-              )}
-              {!loading && deliveryCost === 0 && (
-                  <div className="text-xs ml-6 opacity-80">
-                       Free delivery applied (Order above ₹{state.deliverySettings.freeDeliveryAbove})
-                  </div>
-              )}
             </div>
-          )}
+        );
+    }
 
-          {!isAddingNewAddress && (
-              <Button disabled={!selectedAddress} className="w-full mt-4" onClick={() => setStep(2)}>Next: Summary</Button>
-          )}
-        </div>
-      )}
+    return (
+        <div className="p-4 pb-24 max-w-2xl mx-auto animate-fade-in">
+            {/* Steps Header */}
+            <div className="flex items-center justify-center mb-8">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold ${step >= 1 ? 'bg-primary text-black' : 'bg-gray-200 text-gray-500'}`}>1</div>
+                <div className={`w-12 h-1 ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold ${step >= 2 ? 'bg-primary text-black' : 'bg-gray-200 text-gray-500'}`}>2</div>
+            </div>
 
-      {step === 2 && (
-        <div className="space-y-4 animate-fade-in">
-           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg flex gap-3 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-200">
-               <AlertTriangle className="flex-shrink-0" />
-               <div className="text-sm">
-                   <p className="font-bold mb-1">Please confirm your delivery address</p>
-                   <p className="mb-2">Your order will be delivered to: <br/> <b>{selectedAddress?.fullName}, {selectedAddress?.line1}, {selectedAddress?.city} - {selectedAddress?.pincode}</b></p>
-                   <p className="text-xs opacity-80">Make sure all details (house no, area, phone) are correct to avoid delays.</p>
-               </div>
-           </div>
-
-           <h2 className="text-xl font-semibold dark:text-white">Order Summary</h2>
-           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-             {state.cart.map(i => (
-               <div key={i.id} className="flex justify-between text-sm dark:text-gray-300">
-                 <span>{i.quantity} x {i.name}</span>
-                 <span>₹{i.price * i.quantity}</span>
-               </div>
-             ))}
-             <div className="border-t pt-2 mt-2 flex justify-between font-bold dark:text-white">
-                <span>Delivery</span>
-                <span>{deliveryCost === 0 ? 'FREE' : `₹${deliveryCost}`}</span>
-             </div>
-             <div className="border-t border-black pt-2 flex justify-between font-bold text-lg dark:text-primary">
-                <span>Total</span>
-                <span>₹{state.cart.reduce((a,b) => a + (b.price * b.quantity), 0) + deliveryCost}</span>
-             </div>
-           </div>
-           <Button className="w-full" onClick={() => setStep(3)}>Next: Payment</Button>
-           <button onClick={() => setStep(1)} className="w-full text-center text-gray-500 py-2">Back</button>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="space-y-4 animate-fade-in">
-          <h2 className="text-xl font-semibold dark:text-white flex items-center gap-2"><CreditCard size={20}/> Payment</h2>
-          
-          {state.deliverySettings.codEnabled && (
-              <div 
-                onClick={() => setPaymentMethod('COD')}
-                className={`border p-4 rounded-lg flex items-center gap-3 bg-white dark:bg-gray-800 cursor-pointer transition-all ${paymentMethod === 'COD' ? 'border-primary ring-1 ring-primary' : 'border-gray-200 dark:border-gray-700'}`}
-              >
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'COD' ? 'border-primary' : 'border-gray-400'}`}>
-                    {paymentMethod === 'COD' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-                </div>
+            {step === 1 && (
                 <div>
-                  <p className="font-bold dark:text-white">Cash on Delivery</p>
-                  <p className="text-xs text-gray-500">Pay using cash or UPI upon delivery.</p>
+                    <h2 className="text-xl font-bold mb-4 dark:text-white">Select Delivery Address</h2>
+                    
+                    <div className="space-y-3 mb-6">
+                        {state.addresses.map(addr => (
+                            <div 
+                                key={addr.id} 
+                                onClick={() => setSelectedAddrId(addr.id)}
+                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAddrId === addr.id ? 'border-primary bg-primary/5' : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <h3 className="font-bold dark:text-white">{addr.fullName}</h3>
+                                    {addr.isDefault && <span className="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded font-bold">DEFAULT</span>}
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                    {addr.line1}, {addr.area}, {addr.city} - {addr.pincode}
+                                </p>
+                                <p className="text-sm font-medium dark:text-white">Phone: {addr.phone}</p>
+                            </div>
+                        ))}
+
+                        <button 
+                            onClick={() => setShowAddrForm(true)}
+                            className="w-full py-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl flex items-center justify-center gap-2 text-primary font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                            <Plus size={20} /> Add New Address
+                        </button>
+                    </div>
+
+                    <Button onClick={() => selectedAddrId ? setStep(2) : alert("Select an address")} className="w-full py-3">
+                        Continue to Payment
+                    </Button>
                 </div>
-              </div>
-          )}
+            )}
 
-          <div 
-            onClick={() => setPaymentMethod('Online')}
-            className={`border p-4 rounded-lg flex items-center gap-3 bg-white dark:bg-gray-800 cursor-pointer transition-all ${paymentMethod === 'Online' ? 'border-primary ring-1 ring-primary' : 'border-gray-200 dark:border-gray-700'}`}
-          >
-            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'Online' ? 'border-primary' : 'border-gray-400'}`}>
-                {paymentMethod === 'Online' && <div className="w-2 h-2 rounded-full bg-primary"></div>}
-            </div>
-            <div>
-              <p className="font-bold dark:text-white">Online Payment</p>
-              <p className="text-xs text-gray-500">Credit/Debit Card, Netbanking, UPI.</p>
-            </div>
-          </div>
-          
-          <div className="text-xs text-center text-gray-400 mt-4">
-            By placing this order, you agree to our Terms. No Return Policy applies.
-          </div>
+            {step === 2 && (
+                <div>
+                    <h2 className="text-xl font-bold mb-6 dark:text-white">Payment Method</h2>
+                    
+                    <div className="space-y-3 mb-6">
+                         {state.deliverySettings.codEnabled && (
+                             <div className="p-4 rounded-xl border-2 border-primary bg-primary/5 flex items-center gap-4 cursor-pointer">
+                                 <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center">
+                                     <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
+                                 </div>
+                                 <div>
+                                     <p className="font-bold dark:text-white">Cash on Delivery (COD)</p>
+                                     <p className="text-xs text-gray-500">Pay cash when your order is delivered.</p>
+                                 </div>
+                             </div>
+                         )}
+                         <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 opacity-50 flex items-center gap-4 cursor-not-allowed">
+                             <div className="w-5 h-5 rounded-full border-2 border-gray-400"></div>
+                             <div>
+                                 <p className="font-bold text-gray-500">Online Payment (UPI/Card)</p>
+                                 <p className="text-xs text-gray-400">Temporarily unavailable</p>
+                             </div>
+                         </div>
+                    </div>
 
-          <Button isLoading={loading} className="w-full text-lg" onClick={placeOrder}>
-            {paymentMethod === 'COD' ? 'Place Order' : 'Pay Now'}
-          </Button>
-          <button onClick={() => setStep(2)} className="w-full text-center text-gray-500 py-2">Back</button>
+                    <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-lg flex gap-3 text-sm text-yellow-800 dark:text-yellow-200 mb-6">
+                        <AlertTriangle className="shrink-0" size={20}/>
+                        <p>By placing this order, you agree to our Terms and Conditions.</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
+                        <Button onClick={handlePlaceOrder} isLoading={loading} className="flex-[2] py-3 text-base">Place Order</Button>
+                    </div>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 export const ProfilePage = () => {
-  const { state, dispatch } = useAppContext();
-  const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-  const [isAddingAddr, setIsAddingAddr] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const { state, dispatch } = useAppContext();
+    const navigate = useNavigate();
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [showAddrForm, setShowAddrForm] = useState(false);
+    const user = state.user;
 
-  useEffect(() => {
-    if (state.user) {
-      loadOrders();
+    useEffect(() => {
+        if (user) {
+            loadOrders();
+        } else {
+            setLoading(false);
+        }
+    }, [user]);
+
+    const loadOrders = async () => {
+        if (!user) return;
+        const data = await api.getOrders(false, user.id);
+        setOrders(data);
+        setLoading(false);
+    };
+    
+    // Admin Toggle Logic
+    const toggleAdminMode = async () => {
+        if (!user) return;
+        // In this demo, we simply toggle the isAdmin flag on the current user document
+        const newStatus = !user.isAdmin;
+        await api.updateUserProfile(user.id, { isAdmin: newStatus });
+        dispatch({ type: 'SET_USER', payload: { ...user, isAdmin: newStatus } });
+    };
+    
+    const handleSaveAddress = async (addr: Address) => {
+        if (!state.user) return;
+        const newAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
+        await api.saveAddress(state.user.id, newAddr);
+        const addrs = await api.getAddresses(state.user.id);
+        dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+        setShowAddrForm(false);
+    };
+
+    const handleDeleteAddress = async (addrId: string) => {
+        if (!state.user || !confirm("Delete this address?")) return;
+        await api.deleteAddress(state.user.id, addrId);
+        const addrs = await api.getAddresses(state.user.id);
+        dispatch({ type: 'SET_ADDRESSES', payload: addrs });
     }
-  }, [state.user]);
 
-  const loadOrders = () => {
-      if(!state.user) return;
-      api.getOrders(false, state.user.id).then(setOrders);
-  };
+    if (!user) return null; // Should not happen due to auto-guest session
 
-  const handleSaveAddress = async (addr: Address) => {
-      if (!state.user) return;
-      const finalAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
-      await api.saveAddress(state.user.id, finalAddr);
-      const updated = await api.getAddresses(state.user.id);
-      dispatch({ type: 'SET_ADDRESSES', payload: updated });
-      setEditingAddress(null);
-      setIsAddingAddr(false);
-  };
+    if (showAddrForm) {
+        return (
+            <div className="p-4 animate-fade-in">
+                <AddressForm onSave={handleSaveAddress} onCancel={() => setShowAddrForm(false)} />
+            </div>
+        );
+    }
 
-  const handleDeleteAddress = async (id: string) => {
-      if (!state.user) return;
-      if (confirm("Delete this address?")) {
-          await api.deleteAddress(state.user.id, id);
-          const updated = await api.getAddresses(state.user.id);
-          dispatch({ type: 'SET_ADDRESSES', payload: updated });
-      }
-  };
+    return (
+        <div className="p-4 pb-24 animate-fade-in">
+            <OrderDetailsModal 
+               order={selectedOrder} 
+               onClose={() => setSelectedOrder(null)} 
+               onRefresh={loadOrders}
+               onSubmitReview={async (pid, r, c) => {
+                   // Quick review submission
+                   await api.addReview({
+                       id: 'rev_'+Date.now(), productId: pid, userId: user.id, userName: user.name, rating: r, comment: c,
+                       createdAt: new Date().toISOString(), verifiedPurchase: true, images: [], likes: 0, userPhoto: user.photoURL
+                   });
+               }}
+            />
 
-  const handleSubmitInlineReview = async (pid: string, rating: number, comment: string) => {
-      if (!state.user) return;
-      const review: Review = {
-          id: 'rev_' + Date.now(),
-          productId: pid,
-          userId: state.user.id,
-          userName: state.user.name,
-          userPhoto: state.user.photoURL,
-          rating: rating,
-          comment: comment,
-          images: [],
-          createdAt: new Date().toISOString(),
-          verifiedPurchase: true,
-          likes: 0
-      };
-      await api.addReview(review);
-  };
+            {/* Profile Header */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm mb-6 flex items-center gap-4 border border-gray-100 dark:border-gray-700">
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary-dark text-2xl font-bold border-2 border-primary/20">
+                    {user.name ? user.name[0] : 'G'}
+                </div>
+                <div>
+                    <h1 className="text-xl font-bold dark:text-white">{user.name}</h1>
+                    <p className="text-sm text-gray-500">{user.email}</p>
+                    {user.isAdmin && <span className="inline-block bg-primary/10 text-primary-dark text-xs px-2 py-0.5 rounded mt-1 font-bold border border-primary/20">ADMIN USER</span>}
+                </div>
+            </div>
 
-  // Sort Addresses: Default first
-  const sortedAddresses = useMemo(() => {
-      return [...state.addresses].sort((a, b) => (a.isDefault === b.isDefault ? 0 : a.isDefault ? -1 : 1));
-  }, [state.addresses]);
+            {/* Admin Switch */}
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-700 p-4 rounded-xl shadow-md text-white flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="bg-white/10 p-2 rounded-lg"><ShieldCheck size={20}/></div>
+                    <div>
+                        <p className="font-bold text-sm">Admin Access</p>
+                        <p className="text-xs opacity-70">Manage store content & orders</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={toggleAdminMode}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${user.isAdmin ? 'bg-red-500 hover:bg-red-600' : 'bg-primary text-black hover:bg-primary-dark'}`}
+                >
+                    {user.isAdmin ? 'Disable Admin' : 'Enable Admin'}
+                </button>
+            </div>
 
-  // Wishlist Items
-  const wishlistItems = useMemo(() => {
-      return state.products.filter(p => state.wishlist.includes(p.id));
-  }, [state.products, state.wishlist]);
+            {/* Orders Section */}
+            <div className="mb-8">
+                <h2 className="text-lg font-bold dark:text-white mb-4 flex items-center gap-2"><ShoppingBag size={20}/> My Orders</h2>
+                {loading ? <div className="text-center py-4"><Loader className="animate-spin mx-auto"/></div> : 
+                 orders.length === 0 ? (
+                    <div className="text-center py-8 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700">
+                        <p className="text-gray-500 text-sm">No orders placed yet.</p>
+                        <Button variant="ghost" onClick={() => navigate('/')} className="text-primary mt-2">Start Shopping</Button>
+                    </div>
+                 ) : (
+                    <div className="space-y-3">
+                        {orders.map(order => (
+                            <div key={order.id} onClick={() => setSelectedOrder(order)} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center cursor-pointer hover:shadow-md transition-shadow">
+                                <div className="flex gap-4 items-center">
+                                    <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-2">
+                                        <PackageIcon status={order.status} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-sm dark:text-white">#{order.id.slice(-6)}</p>
+                                        <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()} • {order.items.length} Items</p>
+                                        <p className={`text-xs font-bold mt-1 ${order.status === 'Delivered' ? 'text-green-600' : order.status === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'}`}>
+                                            {order.status}
+                                        </p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={16} className="text-gray-400" />
+                            </div>
+                        ))}
+                    </div>
+                 )}
+            </div>
 
-  if (!state.user) return (
-    <div className="flex flex-col items-center justify-center h-[60vh] gap-4 p-6 text-center">
-      <div className="bg-primary/20 p-4 rounded-full mb-2">
-         <Smartphone size={40} className="text-primary-dark"/>
-      </div>
-      <h2 className="text-xl font-bold dark:text-white">Welcome to OnlineMart</h2>
-      <p className="text-gray-500 text-sm mb-4">Login to view orders, manage addresses, and get personalized recommendations.</p>
-      <Button onClick={() => navigate('/')}>Start Shopping</Button>
-    </div>
-  );
+            {/* Addresses Section */}
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold dark:text-white flex items-center gap-2"><MapPin size={20}/> Saved Addresses</h2>
+                    <Button size="sm" variant="ghost" onClick={() => setShowAddrForm(true)} className="text-primary text-xs"><Plus size={14}/> Add New</Button>
+                </div>
+                <div className="space-y-3">
+                    {state.addresses.map(addr => (
+                        <div key={addr.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative group">
+                            <div className="pr-8">
+                                <p className="font-bold text-sm dark:text-white">{addr.fullName} <span className="text-xs font-normal text-gray-500">({addr.isDefault ? 'Default' : 'Other'})</span></p>
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-1">{addr.line1}, {addr.city}</p>
+                            </div>
+                            <button 
+                                onClick={() => handleDeleteAddress(addr.id)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-red-500"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    ))}
+                    {state.addresses.length === 0 && <p className="text-xs text-gray-400 italic text-center py-4">No addresses saved.</p>}
+                </div>
+            </div>
 
-  return (
-    <div className="p-4 pb-20 space-y-6">
-      <OrderDetailsModal 
-          order={selectedOrder} 
-          onClose={() => setSelectedOrder(null)} 
-          onRefresh={loadOrders}
-          onSubmitReview={handleSubmitInlineReview}
-      />
+            {/* Other Settings */}
+            <div className="space-y-2">
+                <button 
+                    onClick={() => dispatch({type: 'TOGGLE_THEME'})}
+                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700"
+                >
+                    <div className="flex items-center gap-3">
+                        {state.darkMode ? <Moon size={20} className="text-blue-400"/> : <Sun size={20} className="text-yellow-500"/>}
+                        <span className="text-sm font-medium dark:text-white">Dark Mode</span>
+                    </div>
+                    <div className={`w-10 h-5 rounded-full relative transition-colors ${state.darkMode ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${state.darkMode ? 'left-6' : 'left-1'}`}></div>
+                    </div>
+                </button>
+                <Link to="/terms" className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 text-sm font-medium dark:text-white">
+                    <ShieldCheck size={20} className="text-gray-500"/> Terms & Conditions
+                </Link>
+            </div>
 
-      <div className="flex items-center gap-4 bg-primary/10 p-4 rounded-xl">
-        <img src={state.user.photoURL} className="w-16 h-16 rounded-full" alt="Profile" />
-        <div>
-          <h1 className="text-xl font-bold dark:text-white">{state.user.name}</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{state.user.email}</p>
+            <p className="text-center text-xs text-gray-400 mt-8 mb-4">App Version 1.0.2</p>
         </div>
-      </div>
-      
-      {state.user.isAdmin && (
-          <Button onClick={() => navigate('/admin')} className="w-full bg-gray-900 text-white hover:bg-black dark:bg-white dark:text-black">
-              <LayoutDashboard className="w-4 h-4 mr-2"/> Access Admin Dashboard
-          </Button>
-      )}
-
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-            {state.darkMode ? <Moon className="text-blue-400" /> : <Sun className="text-orange-500" />}
-            <span className="font-medium dark:text-white">Dark Mode</span>
-        </div>
-        <button 
-            onClick={() => dispatch({type: 'TOGGLE_THEME'})}
-            className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${state.darkMode ? 'bg-primary justify-end' : 'bg-gray-300 justify-start'}`}
-        >
-            <div className="w-4 h-4 rounded-full bg-white shadow-sm"></div>
-        </button>
-      </div>
-
-      {/* Wishlist Section */}
-      <div className="space-y-4">
-          <h2 className="font-bold text-lg dark:text-white">My Wishlist ({wishlistItems.length})</h2>
-          {wishlistItems.length === 0 ? (
-              <p className="text-gray-500 text-sm">Your wishlist is empty.</p>
-          ) : (
-              <div className="grid grid-cols-2 gap-4">
-                  {wishlistItems.map(p => (
-                      <ProductCard 
-                          key={p.id}
-                          product={p}
-                          isWishlisted={true}
-                          onToggleWishlist={() => dispatch({type: 'TOGGLE_WISHLIST', payload: p.id})}
-                          onAdd={() => dispatch({type: 'ADD_TO_CART', payload: p})}
-                          onClick={() => navigate(`/product/${p.id}`)}
-                      />
-                  ))}
-              </div>
-          )}
-      </div>
-
-      {/* Address Book */}
-      <div className="space-y-4">
-         <div className="flex justify-between items-center">
-             <h2 className="font-bold text-lg dark:text-white">My Addresses</h2>
-             {!isAddingAddr && !editingAddress && (
-                 <Button size="sm" variant="outline" onClick={() => setIsAddingAddr(true)}>Add New</Button>
-             )}
-         </div>
-
-         {isAddingAddr && (
-             <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700">
-                 <AddressForm onSave={handleSaveAddress} onCancel={() => setIsAddingAddr(false)} />
-             </div>
-         )}
-         
-         {editingAddress && (
-             <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700">
-                 <AddressForm initialData={editingAddress} onSave={handleSaveAddress} onCancel={() => setEditingAddress(null)} />
-             </div>
-         )}
-
-         {!isAddingAddr && !editingAddress && (
-             <div className="space-y-3">
-                 {sortedAddresses.length === 0 && <p className="text-gray-500 text-sm">No saved addresses.</p>}
-                 {sortedAddresses.map(addr => (
-                     <div key={addr.id} className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border relative group ${addr.isDefault ? 'border-primary' : 'border-gray-100 dark:border-gray-700'}`}>
-                         <div className="flex justify-between items-start">
-                             <div>
-                                 <p className="font-bold dark:text-white flex items-center gap-2">
-                                     {addr.fullName} 
-                                     {addr.isDefault && <span className="text-[10px] bg-primary text-black px-2 py-0.5 rounded font-extrabold uppercase tracking-wide">Default</span>}
-                                 </p>
-                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{addr.line1}, {addr.area}, {addr.city} - {addr.pincode}</p>
-                                 <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mt-1">Ph: {addr.phone}</p>
-                             </div>
-                             <div className="flex gap-2">
-                                 <button onClick={() => setEditingAddress(addr)} className="p-2 bg-gray-100 dark:bg-gray-700 rounded text-blue-600"><Edit2 size={16}/></button>
-                                 <button onClick={() => handleDeleteAddress(addr.id)} className="p-2 bg-gray-100 dark:bg-gray-700 rounded text-red-600"><Trash2 size={16}/></button>
-                             </div>
-                         </div>
-                     </div>
-                 ))}
-             </div>
-         )}
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="font-bold text-lg dark:text-white">My Orders</h2>
-        {orders.length === 0 ? <p className="text-gray-500">No past orders.</p> : (
-          <div className="space-y-3">
-             {orders.map(order => (
-               <div 
-                    key={order.id} 
-                    onClick={() => setSelectedOrder(order)}
-                    className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 active:scale-95 transition-transform cursor-pointer"
-               >
-                 <div className="flex justify-between items-center mb-2">
-                   <h3 className="text-lg font-bold dark:text-white line-clamp-1 flex-1 mr-4">{order.items[0].name} {order.items.length > 1 && `+ ${order.items.length - 1} more`}</h3>
-                   <span className="text-xs text-gray-500 whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</span>
-                 </div>
-                 
-                 <div className="flex justify-between items-center mt-2">
-                     <span className={`px-2 py-1 rounded text-xs font-bold ${
-                         order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 
-                         order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 
-                         'bg-yellow-100 text-yellow-800'
-                     }`}>
-                         {order.status}
-                     </span>
-                     <div className="flex items-center text-primary text-sm font-semibold gap-1">
-                         View Details <ArrowRight size={14}/>
-                     </div>
-                 </div>
-               </div>
-             ))}
-          </div>
-        )}
-      </div>
-      
-      <Button variant="outline" className="w-full text-red-500 border-red-200" onClick={() => dispatch({type: 'LOGOUT'})}>
-        Logout
-      </Button>
-    </div>
-  );
+    );
 };
+
+const PackageIcon = ({ status }: { status: string }) => {
+    switch (status) {
+        case 'Delivered': return <CheckCircle size={20} className="text-green-600" />;
+        case 'Cancelled': return <X size={20} className="text-red-500" />;
+        case 'Shipped': return <Truck size={20} className="text-blue-500" />;
+        default: return <Clock size={20} className="text-yellow-600" />;
+    }
+};
+  
