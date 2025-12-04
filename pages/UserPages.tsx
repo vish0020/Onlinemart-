@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -5,7 +6,7 @@ import {
   CheckCircle, Search, Mic, Loader, Moon, Sun, 
   Smartphone, Shirt, Home, Sparkles, Gamepad2, Gift, 
   ShoppingBasket, Wrench, Dumbbell, BookOpen, Zap, 
-  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle
+  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard
 } from 'lucide-react';
 import { Product, CartItem, Order, DeliverySettings, Review, Address } from '../types';
 import { Button, Input, ProductCard, Skeleton, ProductSkeleton, AddressForm } from '../components/Shared';
@@ -1656,6 +1657,12 @@ export const ProfilePage = () => {
           <p className="text-sm text-gray-600 dark:text-gray-400">{state.user.email}</p>
         </div>
       </div>
+      
+      {state.user.isAdmin && (
+          <Button onClick={() => navigate('/admin')} className="w-full bg-gray-900 text-white hover:bg-black dark:bg-white dark:text-black">
+              <LayoutDashboard className="w-4 h-4 mr-2"/> Access Admin Dashboard
+          </Button>
+      )}
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
         <div className="flex items-center gap-3">

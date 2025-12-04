@@ -325,7 +325,7 @@ const AppContent = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans pb-16 md:pb-0">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
             {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
             {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
 
@@ -361,16 +361,16 @@ const AppContent = () => {
                             )}
                         </Link>
 
-                        {/* Desktop User Menu */}
+                        {/* User Menu - Visible on all screens now */}
                         {state.user ? (
-                            <Link to="/profile" className="hidden md:flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
+                            <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
                                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-gray-200">
                                     {state.user.photoURL ? <img src={state.user.photoURL} className="w-full h-full object-cover"/> : <span className="font-bold text-xs">{state.user.name[0]}</span>}
                                 </div>
-                                <span className="text-sm font-medium max-w-[100px] truncate">{state.user.name.split(' ')[0]}</span>
+                                <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user.name.split(' ')[0]}</span>
                             </Link>
                         ) : (
-                            <Button size="sm" onClick={() => setShowLoginModal(true)} className="hidden md:flex px-6 rounded-full">
+                            <Button size="sm" onClick={() => setShowLoginModal(true)} className="flex px-4 py-2 rounded-full text-xs md:text-sm">
                                 Login
                             </Button>
                         )}
@@ -433,49 +433,6 @@ const AppContent = () => {
                     </div>
                 </div>
             </main>
-
-            {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t dark:border-gray-800 z-40 pb-safe">
-                <div className="flex justify-around items-center h-16">
-                    <Link to="/" className={`flex flex-col items-center gap-1 p-2 ${location.pathname === '/' ? 'text-primary' : 'text-gray-500'}`}>
-                        <Home size={22} className={location.pathname === '/' ? 'fill-current' : ''} />
-                        <span className="text-[10px] font-medium">Home</span>
-                    </Link>
-                    
-                    {/* Admin Toggle for Mobile */}
-                    {isAdmin ? (
-                         <Link to="/admin" className={`flex flex-col items-center gap-1 p-2 ${location.pathname.startsWith('/admin') ? 'text-primary' : 'text-gray-500'}`}>
-                            <LayoutDashboard size={22} />
-                            <span className="text-[10px] font-medium">Admin</span>
-                        </Link>
-                    ) : (
-                        <div onClick={() => setShowSearch(true)} className="flex flex-col items-center gap-1 p-2 text-gray-500 cursor-pointer">
-                            <Search size={22} />
-                            <span className="text-[10px] font-medium">Search</span>
-                        </div>
-                    )}
-
-                    <Link to="/cart" className={`flex flex-col items-center gap-1 p-2 relative ${location.pathname === '/cart' ? 'text-primary' : 'text-gray-500'}`}>
-                        <div className="relative">
-                             <ShoppingCart size={22} className={location.pathname === '/cart' ? 'fill-current' : ''} />
-                             {cartCount > 0 && (
-                                <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </div>
-                        <span className="text-[10px] font-medium">Cart</span>
-                    </Link>
-
-                    <div 
-                        onClick={() => state.user ? navigate('/profile') : setShowLoginModal(true)}
-                        className={`flex flex-col items-center gap-1 p-2 cursor-pointer ${location.pathname === '/profile' ? 'text-primary' : 'text-gray-500'}`}
-                    >
-                        <UserIcon size={22} className={location.pathname === '/profile' ? 'fill-current' : ''} />
-                        <span className="text-[10px] font-medium">{state.user ? 'Profile' : 'Login'}</span>
-                    </div>
-                </div>
-            </nav>
             
             {/* Footer Info Links */}
             {!isAdminRoute && (
