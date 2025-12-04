@@ -4,9 +4,9 @@ import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } 
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 // --- 1. Firebase Configuration ---
-// Replace these values with your actual Firebase project configuration if needed.
+// Replace with your actual config from Firebase Console
 const firebaseConfig = {
-  apiKey: "AIzaSyANU6ZUxqChdzI-Y_9MfEmy8DnTXsDy-e0",
+  apiKey: "AIzaSyANU6ZUxqChdzI-Y_9MfEmy8DnTXsDy-e0", // Example key, ensure this is valid
   authDomain: "onlinemart-7768c.firebaseapp.com",
   projectId: "onlinemart-7768c",
   storageBucket: "onlinemart-7768c.firebasestorage.app",
@@ -22,6 +22,11 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
+// Configure Google Provider Custom Parameters
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
 // Force persistence to LOCAL (survives refresh and browser restart)
 setPersistence(auth, browserLocalPersistence).catch((error) => {
     console.error("Auth Persistence Error:", error);
@@ -30,6 +35,7 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 // --- 4. Initialize Firestore & Offline Support ---
 export const db = getFirestore(app);
 
+// Enable offline persistence for Firestore
 enableIndexedDbPersistence(db).catch((err) => {
     if (err.code == 'failed-precondition') {
         console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time.");

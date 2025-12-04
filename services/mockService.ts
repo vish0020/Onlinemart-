@@ -20,7 +20,8 @@ import {
     getRedirectResult,
     signOut, 
     onAuthStateChanged,
-    User as FirebaseUser
+    User as FirebaseUser,
+    AuthError
 } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
 import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address } from '../types';
@@ -62,52 +63,56 @@ const convertDoc = <T>(docSnap: any): T => {
     return { id: docSnap.id, ...data } as T;
 };
 
-// --- 4. Core User Logic (The "From Scratch" Auth Handler) ---
+// --- 4. Core User Logic (The Rebuilt Auth Handler) ---
 const handleUserAuth = async (firebaseUser: FirebaseUser): Promise<User> => {
     if (!firebaseUser) throw new Error("No firebase user found");
+
+    const uid = firebaseUser.uid;
+    const userRef = doc(db, "users", uid);
+    const now = new Date().toISOString();
 
     // 1. Identify Admin
     const isAdmin = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
-    // 2. Prepare User Data
-    const userData = {
-        uid: firebaseUser.uid,
+    // 2. Prepare Base User Data
+    const baseUserData = {
+        uid: uid,
         name: firebaseUser.displayName || "User",
         email: firebaseUser.email || "",
         photoURL: firebaseUser.photoURL || "",
-        isAdmin: isAdmin, // Force Admin status based on email
-        lastLogin: new Date().toISOString()
+        isAdmin: isAdmin,
+        lastLogin: now
     };
-
-    const userRef = doc(db, "users", firebaseUser.uid);
 
     try {
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-            // Update existing user (login time & admin status)
+            // Update existing user: Update lastLogin and potentially photo/name if changed
             await updateDoc(userRef, {
-                lastLogin: userData.lastLogin,
-                isAdmin: isAdmin
+                lastLogin: now,
+                name: baseUserData.name,
+                photoURL: baseUserData.photoURL,
+                isAdmin: isAdmin // Ensure admin status is synced
             });
-            // Merge DB data with basic auth data (DB takes precedence for stored fields)
-            return { ...convertDoc<User>(userSnap), ...userData, isAdmin }; 
+            // Return combined data (DB data takes priority for app-specific fields like 'phone')
+            return { ...convertDoc<User>(userSnap), ...baseUserData }; 
         } else {
-            // Create new user
+            // Create new user document
             const newUser = {
-                ...userData,
-                id: firebaseUser.uid,
-                createdAt: new Date().toISOString()
+                ...baseUserData,
+                id: uid,
+                createdAt: now
             };
             await setDoc(userRef, newUser);
             return newUser;
         }
     } catch (error) {
-        console.error("Firestore User Sync Error:", error);
-        // Fallback: return basic auth info if DB fails (offline mode)
+        console.error("Firestore User Sync Error (Offline?):", error);
+        // Fallback: If Firestore fails (e.g. offline), return the Auth data so the user can still 'login' in UI
         return {
-            id: firebaseUser.uid,
-            ...userData
+            id: uid,
+            ...baseUserData
         };
     }
 };
@@ -122,8 +127,21 @@ export const api = {
   subscribeToAuth: (callback: (user: User | null) => void) => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-          const user = await handleUserAuth(firebaseUser);
-          callback(user);
+          try {
+              const user = await handleUserAuth(firebaseUser);
+              callback(user);
+          } catch (e) {
+              console.error("Auth State Change Error:", e);
+              // Fallback to basic auth if sync fails
+              callback({
+                  id: firebaseUser.uid,
+                  name: firebaseUser.displayName || 'User',
+                  email: firebaseUser.email || '',
+                  photoURL: firebaseUser.photoURL || '',
+                  isAdmin: firebaseUser.email === ADMIN_EMAIL,
+                  isAnonymous: false
+              });
+          }
       } else {
           callback(null);
       }
@@ -136,8 +154,21 @@ export const api = {
         const result = await signInWithPopup(auth, googleProvider);
         return await handleUserAuth(result.user);
     } catch (error: any) {
-        console.error("Google Login Error:", error);
-        throw error;
+        const authError = error as AuthError;
+        console.error("Google Login Error:", authError.code, authError.message);
+        
+        // Throw a user-friendly error message
+        if (authError.code === 'auth/popup-blocked') {
+            throw new Error("Popup blocked. Please allow popups for this site.");
+        } else if (authError.code === 'auth/popup-closed-by-user') {
+            throw new Error("Login cancelled by user.");
+        } else if (authError.code === 'auth/unauthorized-domain') {
+            throw new Error("Domain not authorized. Add to Firebase Console.");
+        } else if (authError.code === 'auth/cancelled-popup-request') {
+             throw new Error("Only one popup allowed at a time.");
+        }
+        
+        throw new Error(authError.message || "Login failed.");
     }
   },
 
@@ -165,7 +196,7 @@ export const api = {
   },
 
   // ---------------------------------------------------------
-  // --- Existing Shop Functionality (Preserved) ---
+  // --- Existing Shop Functionality ---
   // ---------------------------------------------------------
 
   getProducts: async (): Promise<Product[]> => {
