@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, ShieldCheck, LogIn, ChevronRight } from 'lucide-react';
 import { api } from './services/mockService';
 import { Logo, Button } from './components/Shared';
 import { HomePage, ProductDetailsPage, CartPage, CheckoutPage, ProfilePage } from './pages/UserPages';
@@ -109,24 +109,105 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
     );
 };
 
+// --- Login Modal Component ---
+const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+    const { dispatch } = useAppContext();
+    const [loading, setLoading] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleGoogleLogin = async () => {
+        setLoading(true);
+        try {
+            const user = await api.signInWithGoogle();
+            dispatch({ type: 'SET_USER', payload: user });
+            const addrs = await api.getAddresses(user.id);
+            dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+            onClose();
+        } catch (error) {
+            alert('Login failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDemoAdmin = async () => {
+        setLoading(true);
+        try {
+            const user = await api.loginAsDemoAdmin();
+            dispatch({ type: 'SET_USER', payload: user });
+            const addrs = await api.getAddresses(user.id);
+            dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+            onClose();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl relative border dark:border-gray-700">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+                    <X size={20} />
+                </button>
+
+                <div className="flex flex-col items-center mb-8">
+                    <Logo size="lg" />
+                    <h2 className="text-2xl font-bold mt-4 dark:text-white">Welcome Back</h2>
+                    <p className="text-gray-500 text-center text-sm mt-2">Sign in to access your orders, admin panel and more.</p>
+                </div>
+
+                <div className="space-y-4">
+                    <Button onClick={handleGoogleLogin} isLoading={loading} className="w-full bg-white text-gray-800 border-2 border-gray-100 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 py-3.5">
+                        <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
+                        Sign in with Google
+                    </Button>
+
+                    <Button onClick={handleDemoAdmin} isLoading={loading} className="w-full bg-black text-white hover:bg-gray-800 py-3.5">
+                        <ShieldCheck size={20} />
+                        Open Demo Admin Account
+                    </Button>
+                    
+                    <div className="relative py-2">
+                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t dark:border-gray-700"></div></div>
+                         <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-gray-800 px-2 text-gray-500">Or</span></div>
+                    </div>
+
+                    <Button variant="ghost" onClick={onClose} className="w-full text-gray-500">
+                        Continue as Guest
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- Main App Content ---
 const AppContent = () => {
     const { state, dispatch } = useAppContext();
     const navigate = useNavigate();
     const location = useLocation();
     const [showSearch, setShowSearch] = useState(false);
+    const [showLoginModal, setShowLoginModal] = useState(false);
     const [initLoading, setInitLoading] = useState(true);
 
     const isAdmin = state.user?.isAdmin;
     const isAdminRoute = location.pathname.startsWith('/admin');
     
     useEffect(() => {
-        // Initialize Guest Session
+        // Initialize Session
         const init = async () => {
             try {
                 const user = await api.initializeSession();
                 dispatch({ type: 'SET_USER', payload: user });
-                // Load user data
+                
+                // Show login modal automatically if user is a guest (Anonymous)
+                if (user && user.isAnonymous && !sessionStorage.getItem('om_login_skipped')) {
+                    setShowLoginModal(true);
+                }
+
                 if (user) {
                     const addrs = await api.getAddresses(user.id);
                     dispatch({ type: 'SET_ADDRESSES', payload: addrs });
@@ -139,6 +220,11 @@ const AppContent = () => {
         };
         init();
     }, []);
+
+    const handleSkipLogin = () => {
+        setShowLoginModal(false);
+        sessionStorage.setItem('om_login_skipped', 'true');
+    }
 
     const cartCount = state.cart.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -154,6 +240,7 @@ const AppContent = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
             {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
+            <LoginModal isOpen={showLoginModal} onClose={handleSkipLogin} />
 
             {/* Header */}
             <header className="sticky top-0 z-40 bg-white dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800 shadow-sm transition-all">
@@ -181,12 +268,23 @@ const AppContent = () => {
                             )}
                         </Link>
 
-                        <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
-                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-gray-200">
-                                <UserIcon size={20} className="text-primary-dark" />
-                            </div>
-                            <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user?.name || "Guest"}</span>
-                        </Link>
+                        {state.user?.isAnonymous ? (
+                             <Button size="sm" onClick={() => setShowLoginModal(true)} className="hidden md:flex text-xs px-4 py-2 h-auto">
+                                 <LogIn size={14} /> Login
+                             </Button>
+                        ) : (
+                            <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-gray-200">
+                                    <UserIcon size={20} className="text-primary-dark" />
+                                </div>
+                                <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user?.name}</span>
+                            </Link>
+                        )}
+                        {state.user?.isAnonymous && (
+                             <button onClick={() => setShowLoginModal(true)} className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                                 <LogIn size={22} />
+                             </button>
+                        )}
                     </div>
                 </div>
                 

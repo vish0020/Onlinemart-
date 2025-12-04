@@ -14,7 +14,8 @@ import {
     Timestamp,
     writeBatch
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { signInWithPopup } from "firebase/auth";
+import { db, auth, googleProvider } from "../firebase";
 import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address } from '../types';
 import { calculateDrivingDistance } from './mapService';
 import { DEFAULT_STORE_LOCATION, DEFAULT_SETTINGS } from '../constants';
@@ -54,53 +55,109 @@ const convertDoc = <T>(docSnap: any): T => {
 
 export const api = {
   
+  // --- AUTH: Google Login ---
+  signInWithGoogle: async (): Promise<User> => {
+      try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const user = result.user;
+          const isAdmin = user.email === 'onlinemart0020@gmail.com';
+          
+          const userData: User = {
+              id: user.uid,
+              name: user.displayName || 'User',
+              email: user.email || '',
+              photoURL: user.photoURL || '',
+              isAdmin: isAdmin,
+              isAnonymous: false,
+              lastLogin: new Date().toISOString()
+          };
+
+          // Save/Update user in Firestore
+          await setDoc(doc(db, "users", user.uid), userData, { merge: true });
+          localStorage.setItem('om_uid', user.uid);
+          return userData;
+      } catch (error) {
+          console.error("Google Sign-In Error", error);
+          throw error;
+      }
+  },
+
+  // --- AUTH: Demo Admin Login ---
+  loginAsDemoAdmin: async (): Promise<User> => {
+      const uid = 'demo_admin_user';
+      const userData: User = {
+          id: uid,
+          name: 'Demo Admin',
+          email: 'admin@demo.com',
+          photoURL: 'https://ui-avatars.com/api/?name=Admin&background=FFD700&color=000',
+          isAdmin: true,
+          isAnonymous: false,
+          lastLogin: new Date().toISOString()
+      };
+      
+      // Save to Firestore to ensure rules pass
+      await setDoc(doc(db, "users", uid), userData, { merge: true });
+      localStorage.setItem('om_uid', uid);
+      return userData;
+  },
+
   // --- SESSION: Initialize Guest/Persistent User ---
   initializeSession: async (): Promise<User> => {
       let uid = localStorage.getItem('om_uid');
+      
+      // Check if it's the demo admin ID
+      if (uid === 'demo_admin_user') {
+           const adminUser = await api.loginAsDemoAdmin();
+           return adminUser;
+      }
+
       if (!uid) {
           uid = 'user_' + Math.random().toString(36).substr(2, 9);
           localStorage.setItem('om_uid', uid);
+      }
+
+      // Default Local Guest Object
+      const localUser: User = {
+          id: uid,
+          name: "Guest User",
+          email: "guest@onlinemart.com",
+          photoURL: "",
+          isAdmin: false,
+          isAnonymous: true,
+          lastLogin: new Date().toISOString()
+      };
+
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          return localUser;
       }
 
       const userRef = doc(db, "users", uid);
       
       try {
           const userSnap = await getDoc(userRef);
+          
           if (userSnap.exists()) {
               const userData = convertDoc<User>(userSnap);
-              // Update last seen
-              updateDoc(userRef, { lastLogin: new Date().toISOString() }).catch(console.error);
+              updateDoc(userRef, { lastLogin: new Date().toISOString() }).catch(() => {});
               return userData;
           } else {
-              // Create new Guest User
-              const newUser: User = {
-                  id: uid,
-                  name: "Guest User",
-                  email: "guest@onlinemart.com",
-                  photoURL: "", // No photo
-                  isAdmin: false,
-                  lastLogin: new Date().toISOString()
-              };
-              await setDoc(userRef, newUser);
-              return newUser;
+              // Create new Guest User in DB
+              await setDoc(userRef, localUser);
+              return localUser;
           }
       } catch (e) {
-          console.error("Error init session:", e);
-          // Fallback offline user
-           return {
-              id: uid,
-              name: "Guest User (Offline)",
-              email: "guest@offline.com",
-              isAdmin: false,
-              isAnonymous: true
-          } as User;
+          return localUser;
       }
   },
 
   // --- Update User Profile (Name/Admin Status) ---
   updateUserProfile: async (userId: string, data: Partial<User>): Promise<void> => {
-      const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, data);
+      try {
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, data);
+      } catch (e) {
+          console.warn("Update profile failed:", e);
+      }
   },
 
   // ---------------------------------------------------------
