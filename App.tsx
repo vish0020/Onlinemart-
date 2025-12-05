@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, ShieldCheck, LogIn, ChevronRight, LogOut, Mail, Lock, User } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, LogIn, ChevronRight, LogOut, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from './firebase';
 import { api } from './services/mockService';
@@ -118,12 +118,14 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
     const [formData, setFormData] = useState({ name: '', email: '', password: '' });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if(isOpen) {
             setMode('login');
             setError('');
             setFormData({ name: '', email: '', password: '' });
+            setShowPassword(false);
         }
     }, [isOpen]);
 
@@ -140,13 +142,6 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleDemoAdmin = async () => {
-        onClose();
-        const user = await api.loginAsDemoAdmin();
-        dispatch({ type: 'SET_USER', payload: user });
-        navigate('/admin');
     };
 
     const handleEmailAuth = async (e: React.FormEvent) => {
@@ -208,40 +203,47 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
                     </div>
                 )}
 
-                <form onSubmit={handleEmailAuth} className="space-y-3 mb-4">
+                <form onSubmit={handleEmailAuth} className="space-y-4 mb-4">
                     {mode === 'signup' && (
-                        <div className="relative">
-                            <User size={18} className="absolute left-3 top-3 text-gray-400" />
+                        <div className="relative group">
+                            <User size={18} className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
                             <Input 
                                 placeholder="Full Name" 
-                                className="pl-10" 
+                                className="pl-10 py-3" 
                                 value={formData.name} 
                                 onChange={e => setFormData({...formData, name: e.target.value})}
                                 required={mode === 'signup'}
                             />
                         </div>
                     )}
-                    <div className="relative">
-                        <Mail size={18} className="absolute left-3 top-3 text-gray-400" />
+                    <div className="relative group">
+                        <Mail size={18} className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
                         <Input 
                             type="email" 
                             placeholder="Email Address" 
-                            className="pl-10" 
+                            className="pl-10 py-3" 
                             value={formData.email} 
                             onChange={e => setFormData({...formData, email: e.target.value})}
                             required
                         />
                     </div>
-                    <div className="relative">
-                        <Lock size={18} className="absolute left-3 top-3 text-gray-400" />
+                    <div className="relative group">
+                        <Lock size={18} className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
                         <Input 
-                            type="password" 
+                            type={showPassword ? "text" : "password"}
                             placeholder="Password" 
-                            className="pl-10" 
+                            className="pl-10 pr-10 py-3" 
                             value={formData.password} 
                             onChange={e => setFormData({...formData, password: e.target.value})}
                             required
                         />
+                        <button 
+                            type="button" 
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                     </div>
 
                     <Button type="submit" isLoading={loading} className="w-full py-3">
@@ -258,11 +260,6 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
                     <Button type="button" onClick={handleGoogleLogin} variant="outline" className="w-full py-3">
                         <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
                         Google
-                    </Button>
-
-                    <Button type="button" onClick={handleDemoAdmin} variant="secondary" className="w-full py-3 text-xs">
-                        <ShieldCheck size={16} />
-                        Demo Admin Access
                     </Button>
 
                     <button type="button" onClick={onClose} className="w-full text-center text-xs text-gray-500 hover:text-primary mt-2">

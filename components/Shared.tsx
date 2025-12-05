@@ -55,9 +55,9 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => (
+export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className = '', ...props }) => (
   <input 
-    className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white"
+    className={`w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white ${className}`}
     {...props}
   />
 );

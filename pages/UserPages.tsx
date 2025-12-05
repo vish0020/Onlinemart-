@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -1189,68 +1188,81 @@ export const CheckoutPage = () => {
     const [step, setStep] = useState(1); // 1: Address, 2: Payment
     const [selectedAddrId, setSelectedAddrId] = useState<string>('');
     const [showAddrForm, setShowAddrForm] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (state.cart.length === 0) navigate('/cart');
         const defaultAddr = state.addresses.find(a => a.isDefault);
         if (defaultAddr) setSelectedAddrId(defaultAddr.id);
         else if (state.addresses.length > 0) setSelectedAddrId(state.addresses[0].id);
+        else {
+            // Auto open address form if no address
+            setShowAddrForm(true);
+        }
     }, [state.addresses]);
 
     const handleSaveAddress = async (addr: Address) => {
         if (!state.user) return;
         const newAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
         
-        // Optimistic UI
-        const updatedAddresses = [...state.addresses, newAddr];
-        dispatch({ type: 'SET_ADDRESSES', payload: updatedAddresses });
-        setSelectedAddrId(newAddr.id);
-        setShowAddrForm(false);
-        
-        // Background sync
+        // Blocking UI until saved to ensure data integrity
         await api.saveAddress(state.user.id, newAddr);
+        
+        // Update Local State
         const fetchedAddrs = await api.getAddresses(state.user.id);
         dispatch({ type: 'SET_ADDRESSES', payload: fetchedAddrs });
+        
+        setSelectedAddrId(newAddr.id);
+        setShowAddrForm(false);
     };
 
-    const handlePlaceOrder = () => {
+    const handlePlaceOrder = async () => {
         if (!state.user) return;
         const address = state.addresses.find(a => a.id === selectedAddrId);
         if (!address) return alert("Please select a delivery address");
 
-        const subtotal = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        const settings = state.deliverySettings;
-        
-        // Calculate dynamic delivery based on distance if available
-        let deliveryCharge = settings.baseCharge;
-        if (subtotal < settings.freeDeliveryAbove) {
-            if (address.distanceFromStore) {
-                deliveryCharge += (Math.ceil(address.distanceFromStore) * settings.perKmCharge);
+        setIsProcessing(true);
+
+        try {
+            const subtotal = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+            const settings = state.deliverySettings;
+            
+            // Calculate dynamic delivery based on distance if available
+            let deliveryCharge = settings.baseCharge;
+            if (subtotal < settings.freeDeliveryAbove) {
+                if (address.distanceFromStore) {
+                    deliveryCharge += (Math.ceil(address.distanceFromStore) * settings.perKmCharge);
+                }
+            } else {
+                deliveryCharge = 0;
             }
-        } else {
-            deliveryCharge = 0;
+            
+            const total = subtotal + deliveryCharge;
+
+            const order: Order = {
+                id: 'ord_' + Date.now(),
+                userId: state.user.id,
+                items: state.cart,
+                totalAmount: total,
+                deliveryCharge: deliveryCharge,
+                status: 'Ordered',
+                createdAt: new Date().toISOString(),
+                shippingAddress: address,
+                paymentMethod: 'COD' // Default for now
+            };
+
+            // Wait for DB Save BEFORE clearing cart and navigating
+            // This ensures data is persistent and removes the "empty profile" bug
+            await api.createOrder(order);
+
+            dispatch({ type: 'CLEAR_CART' });
+            navigate('/profile', { state: { newOrder: true } });
+        } catch (error) {
+            console.error("Order save failed", error);
+            alert("Failed to place order. Please try again.");
+        } finally {
+            setIsProcessing(false);
         }
-        
-        const total = subtotal + deliveryCharge;
-
-        const order: Order = {
-            id: 'ord_' + Date.now(),
-            userId: state.user.id,
-            items: state.cart,
-            totalAmount: total,
-            deliveryCharge: deliveryCharge,
-            status: 'Ordered',
-            createdAt: new Date().toISOString(),
-            shippingAddress: address,
-            paymentMethod: 'COD' // Default for now
-        };
-
-        // Optimistic Navigation
-        dispatch({ type: 'CLEAR_CART' });
-        navigate('/profile', { state: { newOrder: true } });
-        
-        // Background Save
-        api.createOrder(order).catch(err => console.error("Order save failed", err));
     };
 
     if (showAddrForm) {
@@ -1341,8 +1353,10 @@ export const CheckoutPage = () => {
                     </div>
 
                     <div className="flex gap-3">
-                        <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
-                        <Button onClick={handlePlaceOrder} className="flex-[2] py-3 text-base">Place Order</Button>
+                        <Button variant="outline" onClick={() => setStep(1)} className="flex-1" disabled={isProcessing}>Back</Button>
+                        <Button onClick={handlePlaceOrder} className="flex-[2] py-3 text-base" isLoading={isProcessing}>
+                            {isProcessing ? 'Placing Order...' : 'Place Order'}
+                        </Button>
                     </div>
                 </div>
             )}
@@ -1382,15 +1396,10 @@ export const ProfilePage = () => {
         if (!state.user) return;
         const newAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
         
-        // Optimistic UI
-        const updatedAddresses = [...state.addresses, newAddr];
-        dispatch({ type: 'SET_ADDRESSES', payload: updatedAddresses });
-        setShowAddrForm(false);
-        
-        // Sync
         await api.saveAddress(state.user.id, newAddr);
         const addrs = await api.getAddresses(state.user.id);
         dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+        setShowAddrForm(false);
     };
 
     const handleDeleteAddress = async (addrId: string) => {
