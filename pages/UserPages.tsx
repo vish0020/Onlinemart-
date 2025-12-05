@@ -6,14 +6,14 @@ import {
   CheckCircle, Search, Mic, Loader, Moon, Sun, 
   Smartphone, Shirt, Home, Sparkles, Gamepad2, Gift, 
   ShoppingBasket, Wrench, Dumbbell, BookOpen, Zap, 
-  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck
+  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck, LogOut
 } from 'lucide-react';
 import { Product, CartItem, Order, DeliverySettings, Review, Address } from '../types';
 import { Button, Input, ProductCard, Skeleton, ProductSkeleton, AddressForm, Logo } from '../components/Shared';
 import { api, PRODUCT_CATEGORIES } from '../services/mockService';
 import { useAppContext } from '../Context';
 
-// --- Category Icons Mapping ---
+// --- CATEGORY ICONS ---
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   "Electronics": <Smartphone />,
   "Fashion": <Shirt />,
@@ -35,7 +35,6 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 // --- Helper Functions ---
 const generateRepeatedList = (sourceList: Product[]): Product[] => {
   if (!sourceList || sourceList.length === 0) return [];
-  // Repeat strictly 2 times (Original + 2 copies = 3x total)
   return [...sourceList, ...sourceList, ...sourceList];
 };
 
@@ -87,8 +86,6 @@ const HorizontalProductList = ({ products, onProductClick, onAdd, wishlist, onTo
           />
         </div>
       ))}
-      
-      {/* Back to Start Button */}
       <div 
         className="min-w-[120px] w-[120px] flex-shrink-0 flex flex-col items-center justify-center cursor-pointer group rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary bg-gray-50 dark:bg-gray-800/50 transition-all" 
         onClick={scrollToStart}
@@ -156,12 +153,10 @@ const ReviewModal = ({ isOpen, onClose, product, onSubmit }: { isOpen: boolean, 
 const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { order: Order | null, onClose: () => void, onRefresh: () => void, onSubmitReview: (pid: string, rating: number, comment: string) => Promise<void> }) => {
     const [cancelReason, setCancelReason] = useState('');
     const [showCancelInput, setShowCancelInput] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
     
     // Inline Rating State
     const [ratings, setRatings] = useState<Record<string, number>>({});
     const [comments, setComments] = useState<Record<string, string>>({});
-    const [submittingReview, setSubmittingReview] = useState<Record<string, boolean>>({});
     const [submittedItems, setSubmittedItems] = useState<Record<string, boolean>>({});
 
     if (!order) return null;
@@ -171,24 +166,22 @@ const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { orde
     const isCancelled = order.status === 'Cancelled';
     const isDelivered = order.status === 'Delivered';
 
-    const handleCancelRequest = async () => {
+    const handleCancelRequest = () => {
         if(!cancelReason.trim()) return alert("Please provide a reason.");
-        setSubmitting(true);
-        await api.requestOrderCancellation(order.id, cancelReason);
-        setSubmitting(false);
+        
+        // Optimistic Update
+        api.requestOrderCancellation(order.id, cancelReason);
         setShowCancelInput(false);
         onRefresh();
     };
 
-    const handleRateItem = async (itemId: string) => {
+    const handleRateItem = (itemId: string) => {
         const rating = ratings[itemId];
         const comment = comments[itemId] || '';
         if(!rating) return;
 
-        setSubmittingReview(prev => ({...prev, [itemId]: true}));
-        await onSubmitReview(itemId, rating, comment);
-        setSubmittingReview(prev => ({...prev, [itemId]: false}));
         setSubmittedItems(prev => ({...prev, [itemId]: true}));
+        onSubmitReview(itemId, rating, comment);
     };
 
     return (
@@ -267,7 +260,6 @@ const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { orde
                                                 size="sm" 
                                                 className="h-8 px-4 py-0 text-xs ml-auto"
                                                 onClick={() => handleRateItem(item.id)}
-                                                isLoading={submittingReview[item.id]}
                                             >
                                                 Publish
                                             </Button>
@@ -337,7 +329,7 @@ const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { orde
                                  ></textarea>
                                  <div className="flex gap-2">
                                      <Button size="sm" variant="ghost" onClick={() => setShowCancelInput(false)} className="flex-1 bg-white">Back</Button>
-                                     <Button size="sm" onClick={handleCancelRequest} isLoading={submitting} className="flex-1 bg-red-500 hover:bg-red-600 text-white border-none">Confirm Cancel</Button>
+                                     <Button size="sm" onClick={handleCancelRequest} className="flex-1 bg-red-500 hover:bg-red-600 text-white border-none">Confirm Cancel</Button>
                                  </div>
                              </div>
                          )}
@@ -356,7 +348,6 @@ const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { orde
 
 export const HomePage = () => {
     const { state, dispatch } = useAppContext();
-    const [loading, setLoading] = useState(true);
     const [recentItems, setRecentItems] = useState<Product[]>([]);
     const [showReviewPopup, setShowReviewPopup] = useState(false);
     const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
@@ -404,8 +395,6 @@ export const HomePage = () => {
               }
           } catch (error) {
               console.error("Failed to load home page data", error);
-          } finally {
-              setLoading(false);
           }
       }
       fetchData();
@@ -553,7 +542,7 @@ export const HomePage = () => {
         )}
 
         {/* Fallback Banner */}
-        {!state.searchQuery && visibleBanners.length === 0 && !loading && (
+        {!state.searchQuery && visibleBanners.length === 0 && (
              <div className="relative w-full aspect-[21/9] md:aspect-[3/1] bg-gradient-to-r from-primary-light to-primary rounded-b-xl md:rounded-3xl overflow-hidden shadow-md">
                   <div className="absolute inset-0 flex items-center justify-between px-6 md:px-12">
                   <div className="w-2/3 z-10">
@@ -574,8 +563,7 @@ export const HomePage = () => {
                 onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: '' })} 
             />
             <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pb-2">
-                {loading ? [1,2,3,4].map(i => <Skeleton key={i} className="w-20 h-20 flex-shrink-0 rounded-full" />) :
-                availableCategories.map(cat => {
+                {availableCategories.map(cat => {
                 const isActive = state.searchQuery === cat;
                 return (
                     <div key={cat} onClick={() => handleCategoryClick(cat)} className="flex flex-col items-center gap-2 flex-shrink-0 cursor-pointer group select-none">
@@ -613,9 +601,7 @@ export const HomePage = () => {
            )}
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {loading 
-              ? Array(4).fill(0).map((_, i) => <ProductSkeleton key={i} />)
-              : displayedProducts.map(product => (
+            {displayedProducts.map(product => (
                   <ProductCard 
                     key={product.id} 
                     product={product} 
@@ -627,7 +613,7 @@ export const HomePage = () => {
                 ))
             }
           </div>
-          {displayedProducts.length === 0 && !loading && (
+          {displayedProducts.length === 0 && (
              <div className="text-center py-10 text-gray-500">
                  <Search size={48} className="mx-auto mb-2 opacity-20"/>
                  <p>No products found matching your criteria.</p>
@@ -637,7 +623,7 @@ export const HomePage = () => {
         </div>
   
         {/* Extra Categories Sections */}
-        {!state.searchQuery && !loading && (
+        {!state.searchQuery && (
           <div className="space-y-8 animate-slide-up">
               {getProductsByCategory('Electronics').length > 0 && (
                   <div>
@@ -681,7 +667,7 @@ export const HomePage = () => {
         )}
   
         {/* Recently Viewed */}
-        {!loading && recentItems.length > 0 && (
+        {recentItems.length > 0 && (
             <div className="bg-gray-100 dark:bg-gray-800/50 py-6 mt-4">
               <SectionHeader title="Recently Viewed" />
               <HorizontalProductList 
@@ -777,10 +763,10 @@ export const ProductDetailsPage = () => {
           verifiedPurchase: true,
           likes: 0
       };
-      await api.addReview(review);
-      const updatedReviews = await api.getReviews(product.id);
-      setReviews(updatedReviews);
+      // Optimistic update
+      setReviews(prev => [review, ...prev]);
       
+      await api.addReview(review);
       const prods = await api.getProducts();
       dispatch({ type: 'SET_PRODUCTS', payload: prods });
     };
@@ -869,7 +855,7 @@ export const ProductDetailsPage = () => {
         }
     }
   
-    if (!product) return <div className="p-10 text-center"><Loader className="animate-spin mx-auto"/></div>;
+    if (!product) return <div className="p-10 text-center text-gray-400">Loading product...</div>;
     
     const isVideoActive = product.video && activeImg === media.length - 1;
 
@@ -1203,7 +1189,6 @@ export const CheckoutPage = () => {
     const [step, setStep] = useState(1); // 1: Address, 2: Payment
     const [selectedAddrId, setSelectedAddrId] = useState<string>('');
     const [showAddrForm, setShowAddrForm] = useState(false);
-    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (state.cart.length === 0) navigate('/cart');
@@ -1215,19 +1200,24 @@ export const CheckoutPage = () => {
     const handleSaveAddress = async (addr: Address) => {
         if (!state.user) return;
         const newAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
-        await api.saveAddress(state.user.id, newAddr);
-        const addrs = await api.getAddresses(state.user.id);
-        dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+        
+        // Optimistic UI
+        const updatedAddresses = [...state.addresses, newAddr];
+        dispatch({ type: 'SET_ADDRESSES', payload: updatedAddresses });
         setSelectedAddrId(newAddr.id);
         setShowAddrForm(false);
+        
+        // Background sync
+        await api.saveAddress(state.user.id, newAddr);
+        const fetchedAddrs = await api.getAddresses(state.user.id);
+        dispatch({ type: 'SET_ADDRESSES', payload: fetchedAddrs });
     };
 
-    const handlePlaceOrder = async () => {
+    const handlePlaceOrder = () => {
         if (!state.user) return;
         const address = state.addresses.find(a => a.id === selectedAddrId);
         if (!address) return alert("Please select a delivery address");
 
-        setLoading(true);
         const subtotal = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         const settings = state.deliverySettings;
         
@@ -1255,15 +1245,12 @@ export const CheckoutPage = () => {
             paymentMethod: 'COD' // Default for now
         };
 
-        try {
-            await api.createOrder(order);
-            dispatch({ type: 'CLEAR_CART' });
-            navigate('/profile', { state: { newOrder: true } });
-        } catch (error) {
-            alert("Failed to place order. Try again.");
-        } finally {
-            setLoading(false);
-        }
+        // Optimistic Navigation
+        dispatch({ type: 'CLEAR_CART' });
+        navigate('/profile', { state: { newOrder: true } });
+        
+        // Background Save
+        api.createOrder(order).catch(err => console.error("Order save failed", err));
     };
 
     if (showAddrForm) {
@@ -1355,7 +1342,7 @@ export const CheckoutPage = () => {
 
                     <div className="flex gap-3">
                         <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
-                        <Button onClick={handlePlaceOrder} isLoading={loading} className="flex-[2] py-3 text-base">Place Order</Button>
+                        <Button onClick={handlePlaceOrder} className="flex-[2] py-3 text-base">Place Order</Button>
                     </div>
                 </div>
             )}
@@ -1367,7 +1354,6 @@ export const ProfilePage = () => {
     const { state, dispatch } = useAppContext();
     const navigate = useNavigate();
     const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [showAddrForm, setShowAddrForm] = useState(false);
     const user = state.user;
@@ -1375,8 +1361,6 @@ export const ProfilePage = () => {
     useEffect(() => {
         if (user) {
             loadOrders();
-        } else {
-            setLoading(false);
         }
     }, [user]);
 
@@ -1384,35 +1368,56 @@ export const ProfilePage = () => {
         if (!user) return;
         const data = await api.getOrders(false, user.id);
         setOrders(data);
-        setLoading(false);
     };
     
-    // Admin Toggle Logic
+    // Admin Toggle Logic (Only for UI demo purposes in this context, real logic in mockService)
     const toggleAdminMode = async () => {
         if (!user) return;
-        // In this demo, we simply toggle the isAdmin flag on the current user document
         const newStatus = !user.isAdmin;
-        await api.updateUserProfile(user.id, { isAdmin: newStatus });
         dispatch({ type: 'SET_USER', payload: { ...user, isAdmin: newStatus } });
+        await api.updateUserProfile(user.id, { isAdmin: newStatus });
     };
     
     const handleSaveAddress = async (addr: Address) => {
         if (!state.user) return;
         const newAddr = { ...addr, id: addr.id || 'addr_' + Date.now() };
+        
+        // Optimistic UI
+        const updatedAddresses = [...state.addresses, newAddr];
+        dispatch({ type: 'SET_ADDRESSES', payload: updatedAddresses });
+        setShowAddrForm(false);
+        
+        // Sync
         await api.saveAddress(state.user.id, newAddr);
         const addrs = await api.getAddresses(state.user.id);
         dispatch({ type: 'SET_ADDRESSES', payload: addrs });
-        setShowAddrForm(false);
     };
 
     const handleDeleteAddress = async (addrId: string) => {
         if (!state.user || !confirm("Delete this address?")) return;
+        
+        // Optimistic UI
+        const updatedAddresses = state.addresses.filter(a => a.id !== addrId);
+        dispatch({ type: 'SET_ADDRESSES', payload: updatedAddresses });
+        
+        // Sync
         await api.deleteAddress(state.user.id, addrId);
-        const addrs = await api.getAddresses(state.user.id);
-        dispatch({ type: 'SET_ADDRESSES', payload: addrs });
     }
 
-    if (!user) return null; // Should not happen due to auto-guest session
+    const handleLogout = async () => {
+        // Optimistic logout
+        dispatch({ type: 'LOGOUT' });
+        navigate('/');
+        await api.logout();
+    };
+
+    if (!user) return (
+        <div className="p-10 flex flex-col items-center justify-center">
+            <h2 className="text-xl font-bold mb-4 dark:text-white">Guest User</h2>
+            <p className="mb-4 text-gray-500">Please login to view your profile.</p>
+            <Button onClick={() => window.location.reload()}>Login</Button>
+        </div>
+    );
 
     if (showAddrForm) {
         return (
@@ -1429,7 +1434,6 @@ export const ProfilePage = () => {
                onClose={() => setSelectedOrder(null)} 
                onRefresh={loadOrders}
                onSubmitReview={async (pid, r, c) => {
-                   // Quick review submission
                    await api.addReview({
                        id: 'rev_'+Date.now(), productId: pid, userId: user.id, userName: user.name, rating: r, comment: c,
                        createdAt: new Date().toISOString(), verifiedPurchase: true, images: [], likes: 0, userPhoto: user.photoURL
@@ -1438,39 +1442,42 @@ export const ProfilePage = () => {
             />
 
             {/* Profile Header */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm mb-6 flex items-center gap-4 border border-gray-100 dark:border-gray-700">
-                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary-dark text-2xl font-bold border-2 border-primary/20">
-                    {user.name ? user.name[0] : 'G'}
-                </div>
-                <div>
-                    <h1 className="text-xl font-bold dark:text-white">{user.name}</h1>
-                    <p className="text-sm text-gray-500">{user.email}</p>
-                    {user.isAdmin && <span className="inline-block bg-primary/10 text-primary-dark text-xs px-2 py-0.5 rounded mt-1 font-bold border border-primary/20">ADMIN USER</span>}
-                </div>
-            </div>
-
-            {/* Admin Switch */}
-            <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-700 p-4 rounded-xl shadow-md text-white flex justify-between items-center mb-8">
-                <div className="flex items-center gap-3">
-                    <div className="bg-white/10 p-2 rounded-lg"><ShieldCheck size={20}/></div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm mb-6 flex items-center justify-between border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary-dark text-2xl font-bold border-2 border-primary/20 overflow-hidden">
+                        {user.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover"/> : (user.name ? user.name[0] : 'G')}
+                    </div>
                     <div>
-                        <p className="font-bold text-sm">Admin Access</p>
-                        <p className="text-xs opacity-70">Manage store content & orders</p>
+                        <h1 className="text-xl font-bold dark:text-white">{user.name}</h1>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                        {user.isAdmin && <span className="inline-block bg-primary/10 text-primary-dark text-xs px-2 py-0.5 rounded mt-1 font-bold border border-primary/20">ADMIN USER</span>}
                     </div>
                 </div>
-                <button 
-                    onClick={toggleAdminMode}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${user.isAdmin ? 'bg-red-500 hover:bg-red-600' : 'bg-primary text-black hover:bg-primary-dark'}`}
-                >
-                    {user.isAdmin ? 'Disable Admin' : 'Enable Admin'}
+                <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 p-2 rounded-full" title="Logout">
+                    <LogOut size={24} />
                 </button>
             </div>
+
+            {/* Admin Switch (Visible if user is admin) */}
+            {user.isAdmin && (
+                <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-700 p-4 rounded-xl shadow-md text-white flex justify-between items-center mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/10 p-2 rounded-lg"><ShieldCheck size={20}/></div>
+                        <div>
+                            <p className="font-bold text-sm">Admin Access</p>
+                            <p className="text-xs opacity-70">You have full store access</p>
+                        </div>
+                    </div>
+                    <Link to="/admin" className="px-4 py-2 rounded-lg text-xs font-bold bg-primary text-black hover:bg-primary-dark transition-all">
+                        Go to Dashboard
+                    </Link>
+                </div>
+            )}
 
             {/* Orders Section */}
             <div className="mb-8">
                 <h2 className="text-lg font-bold dark:text-white mb-4 flex items-center gap-2"><ShoppingBag size={20}/> My Orders</h2>
-                {loading ? <div className="text-center py-4"><Loader className="animate-spin mx-auto"/></div> : 
-                 orders.length === 0 ? (
+                {orders.length === 0 ? (
                     <div className="text-center py-8 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700">
                         <p className="text-gray-500 text-sm">No orders placed yet.</p>
                         <Button variant="ghost" onClick={() => navigate('/')} className="text-primary mt-2">Start Shopping</Button>
@@ -1542,7 +1549,7 @@ export const ProfilePage = () => {
                 </Link>
             </div>
 
-            <p className="text-center text-xs text-gray-400 mt-8 mb-4">App Version 1.0.2</p>
+            <p className="text-center text-xs text-gray-400 mt-8 mb-4">App Version 1.0.3</p>
         </div>
     );
 };
@@ -1555,4 +1562,3 @@ const PackageIcon = ({ status }: { status: string }) => {
         default: return <Clock size={20} className="text-yellow-600" />;
     }
 };
-  

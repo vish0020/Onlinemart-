@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShoppingCart, Star, Heart, Share2, Plus, Minus, Search, ArrowRight, Loader, CheckCircle, MapPin, X, ChevronLeft } from 'lucide-react';
+import { ShoppingCart, Star, Heart, Plus, Minus, Loader, CheckCircle, MapPin, X } from 'lucide-react';
 import { Product, Address, Location } from '../types';
 import { MOCK_LOCATIONS } from '../services/mockService';
 import { MapPicker } from './MapPicker';
@@ -50,7 +50,6 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button className={`${base} ${variants[variant]} ${className}`} disabled={isLoading} {...props}>
-      {isLoading && <Loader className="animate-spin h-4 w-4" />}
       {children}
     </button>
   );
@@ -205,7 +204,7 @@ export const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSave, o
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in">
+      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in pb-10">
         <h3 className="text-lg font-bold dark:text-white flex justify-between items-center">
           {initialData ? 'Edit Address' : 'Add New Address'}
           {loadingLoc && <span className="text-xs text-primary flex items-center gap-1"><Loader className="animate-spin w-3 h-3"/> Fetching details...</span>}
@@ -272,47 +271,52 @@ export const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSave, o
         <Input placeholder="House No., Building Name (Required)" value={formData.line1} onChange={e => setFormData({...formData, line1: e.target.value})} required />
         <Input placeholder="Road Name, Area, Colony (Required)" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} required />
         <Input placeholder="Landmark (Optional)" value={formData.landmark} onChange={e => setFormData({...formData, landmark: e.target.value})} />
-
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-2 p-3 border rounded-lg dark:border-gray-700">
            <input 
              type="checkbox" 
-             id="def" 
-             className="w-5 h-5 accent-primary" 
-             checked={formData.isDefault}
-             onChange={e => setFormData({...formData, isDefault: e.target.checked})}
+             id="defaultAddr" 
+             checked={formData.isDefault} 
+             onChange={e => setFormData({...formData, isDefault: e.target.checked})} 
+             className="w-5 h-5 accent-primary"
            />
-           <label htmlFor="def" className="text-sm dark:text-gray-300">Make this my default address</label>
+           <label htmlFor="defaultAddr" className="dark:text-white text-sm">Make this my default address</label>
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="ghost" onClick={onCancel} className="flex-1">Cancel</Button>
-          <Button type="submit" className="flex-1">Save Address</Button>
+            <Button type="button" variant="ghost" onClick={onCancel} className="flex-1">Cancel</Button>
+            <Button type="submit" className="flex-1">Save Address</Button>
         </div>
       </form>
 
-      {/* Full Screen Map Modal */}
+      {/* Map Modal */}
       {showMapModal && (
-        <div className="fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex flex-col animate-slide-up">
-            <div className="absolute top-4 left-4 z-[500]">
-                <button onClick={() => setShowMapModal(false)} className="bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg text-gray-700 dark:text-white hover:bg-gray-50">
-                    <ChevronLeft size={24} />
-                </button>
-            </div>
-            
-            <div className="flex-1 relative">
-                <MapPicker 
-                    initialLocation={tempLocation || formData.location} 
-                    onLocationSelect={setTempLocation}
-                    height="100%"
-                />
-            </div>
+          <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center">
+              <div className="bg-white dark:bg-gray-800 w-full h-[80vh] sm:h-[600px] sm:max-w-2xl sm:rounded-2xl rounded-t-2xl flex flex-col relative animate-slide-up">
+                   <button onClick={() => setShowMapModal(false)} className="absolute top-4 right-4 z-10 bg-white dark:bg-gray-900 p-2 rounded-full shadow-md text-gray-500">
+                       <X size={20}/>
+                   </button>
+                   
+                   <div className="p-4 border-b dark:border-gray-700">
+                       <h3 className="font-bold text-lg dark:text-white">Pin your delivery location</h3>
+                       <p className="text-xs text-gray-500">Drag marker to exact location</p>
+                   </div>
+                   
+                   <div className="flex-1 relative">
+                        <MapPicker 
+                           initialLocation={tempLocation || { lat: 20.5937, lng: 78.9629 }}
+                           onLocationSelect={setTempLocation}
+                           height="100%"
+                        />
+                   </div>
 
-            <div className="p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10">
-                <Button onClick={handleMapConfirmation} className="w-full text-lg py-3 shadow-xl">
-                    Confirm Location
-                </Button>
-            </div>
-        </div>
+                   <div className="p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800 sm:rounded-b-2xl">
+                       <Button onClick={handleMapConfirmation} className="w-full py-3">
+                           Confirm Location
+                       </Button>
+                   </div>
+              </div>
+          </div>
       )}
     </>
   );

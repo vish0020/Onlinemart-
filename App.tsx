@@ -1,7 +1,9 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, ShieldCheck, LogIn, ChevronRight } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, ShieldCheck, LogIn, ChevronRight, LogOut } from 'lucide-react';
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from './firebase';
 import { api } from './services/mockService';
 import { Logo, Button } from './components/Shared';
 import { HomePage, ProductDetailsPage, CartPage, CheckoutPage, ProfilePage } from './pages/UserPages';
@@ -112,38 +114,26 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
 // --- Login Modal Component ---
 const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
     const { dispatch } = useAppContext();
-    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     if (!isOpen) return null;
 
     const handleGoogleLogin = async () => {
-        setLoading(true);
         try {
+            // Optimistic close
+            onClose();
             const user = await api.signInWithGoogle();
             dispatch({ type: 'SET_USER', payload: user });
-            const addrs = await api.getAddresses(user.id);
-            dispatch({ type: 'SET_ADDRESSES', payload: addrs });
-            onClose();
         } catch (error) {
-            alert('Login failed. Please try again.');
-        } finally {
-            setLoading(false);
+            // Error handling silently or toast
         }
     };
 
     const handleDemoAdmin = async () => {
-        setLoading(true);
-        try {
-            const user = await api.loginAsDemoAdmin();
-            dispatch({ type: 'SET_USER', payload: user });
-            const addrs = await api.getAddresses(user.id);
-            dispatch({ type: 'SET_ADDRESSES', payload: addrs });
-            onClose();
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
+        onClose();
+        const user = await api.loginAsDemoAdmin();
+        dispatch({ type: 'SET_USER', payload: user });
+        navigate('/admin'); // Redirect to Admin Dashboard immediately
     };
 
     return (
@@ -155,19 +145,19 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
 
                 <div className="flex flex-col items-center mb-8">
                     <Logo size="lg" />
-                    <h2 className="text-2xl font-bold mt-4 dark:text-white">Welcome Back</h2>
-                    <p className="text-gray-500 text-center text-sm mt-2">Sign in to access your orders, admin panel and more.</p>
+                    <h2 className="text-2xl font-bold mt-4 dark:text-white">Welcome</h2>
+                    <p className="text-gray-500 text-center text-sm mt-2">Sign in to access your orders and account.</p>
                 </div>
 
                 <div className="space-y-4">
-                    <Button onClick={handleGoogleLogin} isLoading={loading} className="w-full bg-white text-gray-800 border-2 border-gray-100 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 py-3.5">
+                    <Button onClick={handleGoogleLogin} className="w-full bg-white text-gray-800 border-2 border-gray-100 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 py-3.5">
                         <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
                         Sign in with Google
                     </Button>
 
-                    <Button onClick={handleDemoAdmin} isLoading={loading} className="w-full bg-black text-white hover:bg-gray-800 py-3.5">
+                    <Button onClick={handleDemoAdmin} className="w-full bg-black text-white hover:bg-gray-800 py-3.5">
                         <ShieldCheck size={20} />
-                        Open Demo Admin Account
+                        Demo Admin Login
                     </Button>
                     
                     <div className="relative py-2">
@@ -191,56 +181,40 @@ const AppContent = () => {
     const location = useLocation();
     const [showSearch, setShowSearch] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
-    const [initLoading, setInitLoading] = useState(true);
 
     const isAdmin = state.user?.isAdmin;
     const isAdminRoute = location.pathname.startsWith('/admin');
     
     useEffect(() => {
-        // Initialize Session
-        const init = async () => {
-            try {
-                const user = await api.initializeSession();
-                dispatch({ type: 'SET_USER', payload: user });
+        // --- AUTH LISTENER ---
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                const userProfile = await api.syncUserToFirestore(firebaseUser);
+                dispatch({ type: 'SET_USER', payload: userProfile });
                 
-                // Show login modal automatically if user is a guest (Anonymous)
-                if (user && user.isAnonymous && !sessionStorage.getItem('om_login_skipped')) {
-                    setShowLoginModal(true);
+                const addrs = await api.getAddresses(userProfile.id);
+                dispatch({ type: 'SET_ADDRESSES', payload: addrs });
+            } else {
+                dispatch({ type: 'SET_USER', payload: null });
+                dispatch({ type: 'SET_ADDRESSES', payload: [] });
+                
+                const localUid = localStorage.getItem('om_uid');
+                if (localUid === 'demo_admin_user') {
+                     const admin = await api.loginAsDemoAdmin();
+                     dispatch({ type: 'SET_USER', payload: admin });
                 }
-
-                if (user) {
-                    const addrs = await api.getAddresses(user.id);
-                    dispatch({ type: 'SET_ADDRESSES', payload: addrs });
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setInitLoading(false);
             }
-        };
-        init();
+        });
+
+        return () => unsubscribe();
     }, []);
 
-    const handleSkipLogin = () => {
-        setShowLoginModal(false);
-        sessionStorage.setItem('om_login_skipped', 'true');
-    }
-
     const cartCount = state.cart.reduce((acc, item) => acc + item.quantity, 0);
-
-    if (initLoading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900 flex-col gap-4">
-                <Loader className="animate-spin text-primary w-10 h-10" />
-                <p className="text-gray-500 text-sm">Loading store...</p>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
             {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
-            <LoginModal isOpen={showLoginModal} onClose={handleSkipLogin} />
+            <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
 
             {/* Header */}
             <header className="sticky top-0 z-40 bg-white dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800 shadow-sm transition-all">
@@ -268,22 +242,17 @@ const AppContent = () => {
                             )}
                         </Link>
 
-                        {state.user?.isAnonymous ? (
-                             <Button size="sm" onClick={() => setShowLoginModal(true)} className="hidden md:flex text-xs px-4 py-2 h-auto">
-                                 <LogIn size={14} /> Login
+                        {!state.user ? (
+                             <Button size="sm" onClick={() => setShowLoginModal(true)} className="text-xs px-4 py-2 h-auto">
+                                 <LogIn size={14} /> <span className="hidden md:inline">Login</span>
                              </Button>
                         ) : (
                             <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 py-1 px-2 rounded-full transition-colors">
                                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-gray-200">
-                                    <UserIcon size={20} className="text-primary-dark" />
+                                    {state.user.photoURL ? <img src={state.user.photoURL} className="w-full h-full object-cover"/> : <UserIcon size={20} className="text-primary-dark" />}
                                 </div>
-                                <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user?.name}</span>
+                                <span className="hidden md:block text-sm font-medium max-w-[100px] truncate">{state.user.name}</span>
                             </Link>
-                        )}
-                        {state.user?.isAnonymous && (
-                             <button onClick={() => setShowLoginModal(true)} className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-                                 <LogIn size={22} />
-                             </button>
                         )}
                     </div>
                 </div>

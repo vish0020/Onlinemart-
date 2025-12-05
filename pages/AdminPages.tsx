@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Package, Truck, DollarSign, Users, Trash2, Edit2, Plus, Save, XCircle, Image as ImageIcon, MessageSquare, Filter, Star, Layout, ArrowUp, ArrowDown, X, AlertOctagon, Eye, EyeOff, Video, Info, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Package, DollarSign, Users, Trash2, Edit2, Plus, Save, XCircle, Filter, Star, Layout, ArrowUp, ArrowDown, X, AlertOctagon, Eye, EyeOff, Video, Info, MapPin, Box, ClipboardList, Layers, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Location } from '../types';
 import { api, PRODUCT_CATEGORIES } from '../services/mockService';
 import { Button, Input } from '../components/Shared';
@@ -25,27 +25,63 @@ export const AdminDashboard = () => {
     return (
         <div className="p-6 space-y-6 pb-20 dark:text-gray-100">
             <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+
+            {/* Navigation Grid for Mobile/Tablet */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                 <Link to="/admin/products" className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors shadow-sm">
+                     <Box size={24} />
+                     <span className="font-bold text-sm">Products</span>
+                 </Link>
+                 <Link to="/admin/orders" className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300 border border-yellow-100 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors shadow-sm">
+                     <ClipboardList size={24} />
+                     <span className="font-bold text-sm">Orders</span>
+                 </Link>
+                 <Link to="/admin/content" className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors shadow-sm">
+                     <Layers size={24} />
+                     <span className="font-bold text-sm">Content</span>
+                 </Link>
+                 <Link to="/" className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-sm">
+                     <LayoutDashboard size={24} />
+                     <span className="font-bold text-sm">Store Front</span>
+                 </Link>
+            </div>
+
+            <h2 className="text-lg font-bold mt-8 mb-2">Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4 border border-gray-100 dark:border-gray-700">
                     <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-full text-primary-dark"><DollarSign /></div>
                     <div><p className="text-sm text-gray-500">Total Revenue</p><p className="text-2xl font-bold">₹{stats.revenue}</p></div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4 border border-gray-100 dark:border-gray-700">
                     <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full text-blue-600"><Package /></div>
                     <div><p className="text-sm text-gray-500">Total Orders</p><p className="text-2xl font-bold">{stats.orders}</p></div>
                 </div>
-                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4">
+                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4 border border-gray-100 dark:border-gray-700">
                     <div className="p-3 bg-green-100 dark:bg-green-900 rounded-full text-green-600"><Users /></div>
                     <div><p className="text-sm text-gray-500">Total Visitors</p><p className="text-2xl font-bold">1,204</p></div>
                 </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-                <div className="p-4 border-b dark:border-gray-700 font-bold">Recent Orders</div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+                <div className="p-4 border-b dark:border-gray-700 font-bold flex justify-between items-center">
+                    <span>Recent Orders</span>
+                    <Link to="/admin/orders" className="text-xs text-primary font-bold">View All</Link>
+                </div>
                 <div className="divide-y dark:divide-gray-700">
+                    {recentOrders.length === 0 && <p className="p-4 text-gray-500 text-sm">No orders yet.</p>}
                     {recentOrders.map(order => (
-                        <div key={order.id} className="p-4 flex justify-between items-center">
-                            <div><p className="font-medium text-sm">#{order.id.slice(-6)}</p><p className="text-xs text-gray-500">{order.items.length} items</p></div>
-                            <span className={`w-2 h-2 rounded-full ${order.status === 'Ordered' ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
+                        <div key={order.id} className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                            <div>
+                                <p className="font-medium text-sm">#{order.id.slice(-6)} <span className="text-gray-400">• {order.shippingAddress.fullName}</span></p>
+                                <p className="text-xs text-gray-500">{order.items.length} items • ₹{order.totalAmount}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                order.status === 'Ordered' ? 'bg-yellow-100 text-yellow-800' : 
+                                order.status === 'Delivered' ? 'bg-green-100 text-green-800' : 
+                                'bg-gray-100 text-gray-800'
+                            }`}>
+                                {order.status}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -98,18 +134,21 @@ export const AdminProducts = () => {
   return (
     <div className="p-6 pb-20">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold dark:text-white">Product Manager</h1>
+        <div className="flex items-center gap-2">
+            <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
+            <h1 className="text-2xl font-bold dark:text-white">Product Manager</h1>
+        </div>
         <Button onClick={() => {
             setEditing({
                 id: '', name: '', price: 0, originalPrice: 0, description: '', category: '', subcategory: '', images: ['https://picsum.photos/200'], stock: 10, rating: 0, reviewCount: 0, video: ''
             });
             setTempImage('');
-        }}><Plus size={20}/> Add Product</Button>
+        }}><Plus size={20}/> <span className="hidden sm:inline">Add Product</span></Button>
       </div>
 
       {editing && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 p-6 rounded-xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 p-6 rounded-xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
             <h2 className="text-xl font-bold dark:text-white">{editing.id ? 'Edit' : 'New'} Product</h2>
             <Input placeholder="Name" value={editing.name} onChange={e => setEditing({...editing, name: e.target.value})} required />
             
@@ -221,15 +260,16 @@ export const AdminProducts = () => {
       )}
 
       <div className="grid gap-4">
+        {state.products.length === 0 && <p className="text-center text-gray-500 py-10">No products found. Add one to get started.</p>}
         {state.products.map(p => (
           <div key={p.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg flex items-center gap-4 shadow-sm border dark:border-gray-700">
-             <img src={p.images[0]} className="w-16 h-16 rounded object-cover" alt="" />
+             <img src={p.images[0]} className="w-16 h-16 rounded object-cover bg-gray-100" alt="" />
              <div className="flex-1">
-               <h3 className="font-bold dark:text-white">{p.name}</h3>
+               <h3 className="font-bold dark:text-white line-clamp-1">{p.name}</h3>
                <div className="text-sm text-gray-500 flex items-center gap-2">
                    <span className="font-medium text-black dark:text-white">₹{p.price}</span>
                    {p.originalPrice && <span className="line-through text-xs">₹{p.originalPrice}</span>}
-                   <span>• {p.category}</span>
+                   <span className="hidden sm:inline">• {p.category}</span>
                </div>
                {p.video && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold mt-1 inline-block">VIDEO</span>}
              </div>
@@ -279,7 +319,10 @@ export const AdminOrdersPage = () => {
 
   return (
     <div className="p-4 pb-24">
-      <h1 className="text-2xl font-bold mb-6 dark:text-white">Order Management</h1>
+      <div className="flex items-center gap-2 mb-6">
+          <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
+          <h1 className="text-2xl font-bold dark:text-white">Order Management</h1>
+      </div>
       
       <div className="space-y-4">
         {orders.length === 0 && <p className="text-gray-500 text-center py-10">No orders yet.</p>}
@@ -306,7 +349,7 @@ export const AdminOrdersPage = () => {
             </div>
             <div className="flex justify-between items-center border-t dark:border-gray-700 pt-2 mt-2">
                <span className="font-bold text-primary-dark dark:text-primary">₹{order.totalAmount}</span>
-               <span className="text-xs text-blue-500 font-medium">View Details &rarr;</span>
+               <span className="text-xs text-blue-500 font-medium flex items-center gap-1">View Details <ChevronRight size={14}/></span>
             </div>
           </div>
         ))}
@@ -507,7 +550,10 @@ export const AdminReviewsPage = () => {
 
     return (
         <div className="p-6 pb-20">
-            <h1 className="text-2xl font-bold mb-6 dark:text-white">Content Management</h1>
+             <div className="flex items-center gap-2 mb-6">
+                <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
+                <h1 className="text-2xl font-bold dark:text-white">Content Management</h1>
+            </div>
             
             <div className="flex gap-4 mb-6 border-b dark:border-gray-700 overflow-x-auto">
                 <button 
