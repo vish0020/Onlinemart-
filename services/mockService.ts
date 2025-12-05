@@ -12,7 +12,13 @@ import {
     runTransaction,
     serverTimestamp
 } from "firebase/database";
-import { signInWithPopup, signOut } from "firebase/auth";
+import { 
+    signInWithPopup, 
+    signOut, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    updateProfile 
+} from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
 import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address } from '../types';
 import { calculateDrivingDistance } from './mapService';
@@ -75,6 +81,30 @@ export const api = {
           return await api.syncUserToFirestore(firebaseUser);
       } catch (error) {
           console.error("Google Sign-In Error", error);
+          throw error;
+      }
+  },
+
+  // --- AUTH: Email Sign Up ---
+  signUpWithEmail: async (name: string, email: string, pass: string): Promise<User> => {
+      try {
+          const result = await createUserWithEmailAndPassword(auth, email, pass);
+          // Update profile with name immediately
+          await updateProfile(result.user, { displayName: name });
+          return await api.syncUserToFirestore({ ...result.user, displayName: name });
+      } catch (error) {
+          console.error("Sign Up Error", error);
+          throw error;
+      }
+  },
+
+  // --- AUTH: Email Login ---
+  loginWithEmail: async (email: string, pass: string): Promise<User> => {
+      try {
+          const result = await signInWithEmailAndPassword(auth, email, pass);
+          return await api.syncUserToFirestore(result.user);
+      } catch (error) {
+          console.error("Login Error", error);
           throw error;
       }
   },

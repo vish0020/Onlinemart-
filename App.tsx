@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, ShieldCheck, LogIn, ChevronRight, LogOut } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, ShieldCheck, LogIn, ChevronRight, LogOut, Mail, Lock, User } from 'lucide-react';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from './firebase';
 import { api } from './services/mockService';
-import { Logo, Button } from './components/Shared';
+import { Logo, Button, Input } from './components/Shared';
 import { HomePage, ProductDetailsPage, CartPage, CheckoutPage, ProfilePage } from './pages/UserPages';
 import { AdminDashboard, AdminProducts, AdminOrdersPage, AdminReviewsPage } from './pages/AdminPages';
 import { TermsPage, PrivacyPage } from './pages/InfoPages';
@@ -115,17 +114,31 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
 const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
     const { dispatch } = useAppContext();
     const navigate = useNavigate();
+    const [mode, setMode] = useState<'login' | 'signup'>('login');
+    const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if(isOpen) {
+            setMode('login');
+            setError('');
+            setFormData({ name: '', email: '', password: '' });
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleGoogleLogin = async () => {
         try {
-            // Optimistic close
-            onClose();
+            setLoading(true);
             const user = await api.signInWithGoogle();
             dispatch({ type: 'SET_USER', payload: user });
-        } catch (error) {
-            // Error handling silently or toast
+            onClose();
+        } catch (error: any) {
+            setError(error.message || "Google Sign-in failed");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -133,41 +146,128 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
         onClose();
         const user = await api.loginAsDemoAdmin();
         dispatch({ type: 'SET_USER', payload: user });
-        navigate('/admin'); // Redirect to Admin Dashboard immediately
+        navigate('/admin');
+    };
+
+    const handleEmailAuth = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            if (mode === 'signup') {
+                if(!formData.name) throw new Error("Name is required");
+                const user = await api.signUpWithEmail(formData.name, formData.email, formData.password);
+                dispatch({ type: 'SET_USER', payload: user });
+            } else {
+                const user = await api.loginWithEmail(formData.email, formData.password);
+                dispatch({ type: 'SET_USER', payload: user });
+            }
+            onClose();
+        } catch (error: any) {
+            console.error(error);
+            let msg = "Authentication failed";
+            if(error.code === 'auth/email-already-in-use') msg = "Email already registered";
+            if(error.code === 'auth/invalid-credential') msg = "Invalid email or password";
+            if(error.code === 'auth/weak-password') msg = "Password should be at least 6 chars";
+            setError(msg);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl relative border dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative border dark:border-gray-700 max-h-[90vh] overflow-y-auto">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
                     <X size={20} />
                 </button>
 
-                <div className="flex flex-col items-center mb-8">
-                    <Logo size="lg" />
-                    <h2 className="text-2xl font-bold mt-4 dark:text-white">Welcome</h2>
-                    <p className="text-gray-500 text-center text-sm mt-2">Sign in to access your orders and account.</p>
+                <div className="flex flex-col items-center mb-6">
+                    <Logo size="md" />
                 </div>
 
-                <div className="space-y-4">
-                    <Button onClick={handleGoogleLogin} className="w-full bg-white text-gray-800 border-2 border-gray-100 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 py-3.5">
-                        <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
-                        Sign in with Google
-                    </Button>
+                {/* Tabs */}
+                <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg mb-6">
+                    <button 
+                        onClick={() => { setMode('login'); setError(''); }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === 'login' ? 'bg-white dark:bg-gray-600 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        Login
+                    </button>
+                    <button 
+                        onClick={() => { setMode('signup'); setError(''); }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === 'signup' ? 'bg-white dark:bg-gray-600 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        Sign Up
+                    </button>
+                </div>
 
-                    <Button onClick={handleDemoAdmin} className="w-full bg-black text-white hover:bg-gray-800 py-3.5">
-                        <ShieldCheck size={20} />
-                        Demo Admin Login
-                    </Button>
-                    
-                    <div className="relative py-2">
-                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t dark:border-gray-700"></div></div>
-                         <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-gray-800 px-2 text-gray-500">Or</span></div>
+                {error && (
+                    <div className="mb-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 p-3 rounded-lg text-xs font-bold text-center">
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleEmailAuth} className="space-y-3 mb-4">
+                    {mode === 'signup' && (
+                        <div className="relative">
+                            <User size={18} className="absolute left-3 top-3 text-gray-400" />
+                            <Input 
+                                placeholder="Full Name" 
+                                className="pl-10" 
+                                value={formData.name} 
+                                onChange={e => setFormData({...formData, name: e.target.value})}
+                                required={mode === 'signup'}
+                            />
+                        </div>
+                    )}
+                    <div className="relative">
+                        <Mail size={18} className="absolute left-3 top-3 text-gray-400" />
+                        <Input 
+                            type="email" 
+                            placeholder="Email Address" 
+                            className="pl-10" 
+                            value={formData.email} 
+                            onChange={e => setFormData({...formData, email: e.target.value})}
+                            required
+                        />
+                    </div>
+                    <div className="relative">
+                        <Lock size={18} className="absolute left-3 top-3 text-gray-400" />
+                        <Input 
+                            type="password" 
+                            placeholder="Password" 
+                            className="pl-10" 
+                            value={formData.password} 
+                            onChange={e => setFormData({...formData, password: e.target.value})}
+                            required
+                        />
                     </div>
 
-                    <Button variant="ghost" onClick={onClose} className="w-full text-gray-500">
-                        Continue as Guest
+                    <Button type="submit" isLoading={loading} className="w-full py-3">
+                        {mode === 'login' ? 'Login' : 'Create Account'}
                     </Button>
+                </form>
+
+                <div className="relative py-2 mb-4">
+                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t dark:border-gray-700"></div></div>
+                     <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-gray-800 px-2 text-gray-500">Or continue with</span></div>
+                </div>
+
+                <div className="space-y-3">
+                    <Button type="button" onClick={handleGoogleLogin} variant="outline" className="w-full py-3">
+                        <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
+                        Google
+                    </Button>
+
+                    <Button type="button" onClick={handleDemoAdmin} variant="secondary" className="w-full py-3 text-xs">
+                        <ShieldCheck size={16} />
+                        Demo Admin Access
+                    </Button>
+
+                    <button type="button" onClick={onClose} className="w-full text-center text-xs text-gray-500 hover:text-primary mt-2">
+                        Skip & Continue as Guest
+                    </button>
                 </div>
             </div>
         </div>

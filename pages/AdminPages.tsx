@@ -94,22 +94,45 @@ export const AdminProducts = () => {
   const { state, dispatch } = useAppContext();
   const [editing, setEditing] = useState<Product | null>(null);
   const [tempImage, setTempImage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleDelete = async (id: string) => {
     if(confirm("Delete product?")) {
-      await api.deleteProduct(id);
-      dispatch({type: 'DELETE_PRODUCT', payload: id});
+      try {
+        await api.deleteProduct(id);
+        dispatch({type: 'DELETE_PRODUCT', payload: id});
+      } catch (error) {
+        alert("Failed to delete. You might not have permission.");
+      }
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
-    const product = { ...editing, id: editing.id || 'p_' + Date.now() };
-    await api.saveProduct(product);
-    const all = await api.getProducts();
-    dispatch({type: 'SET_PRODUCTS', payload: all});
-    setEditing(null);
+
+    if (state.user?.id === 'demo_admin_user') {
+        alert("DEMO MODE: You cannot save changes to the real database. Please login with the real admin account (onlinemart0020@gmail.com) to manage the store.");
+        return;
+    }
+
+    setIsSaving(true);
+    try {
+        // Generate a cleaner ID if new
+        const newId = editing.id || `p_${Date.now()}`;
+        const product = { ...editing, id: newId };
+        
+        await api.saveProduct(product);
+        
+        const all = await api.getProducts();
+        dispatch({type: 'SET_PRODUCTS', payload: all});
+        setEditing(null);
+    } catch (error: any) {
+        console.error("Save Error:", error);
+        alert(`Failed to save product. Error: ${error.message || "Permission Denied"}`);
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const handleAddImage = () => {
@@ -253,7 +276,7 @@ export const AdminProducts = () => {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
-              <Button type="submit">Save Product</Button>
+              <Button type="submit" isLoading={isSaving}>{isSaving ? 'Saving...' : 'Save Product'}</Button>
             </div>
           </form>
         </div>
