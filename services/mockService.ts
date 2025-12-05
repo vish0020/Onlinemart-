@@ -54,14 +54,22 @@ export const MOCK_LOCATIONS = {
 };
 
 export const PRODUCT_CATEGORIES: Record<string, string[]> = {
-  "Electronics": ["Mobiles", "Mobile Accessories", "Laptops", "Smartwatches", "Headphones", "Speakers"],
-  "Fashion": ["Men", "Women", "Kids", "Watches", "Shoes"],
-  "Home & Kitchen": ["Decor", "Kitchenware", "Bedding", "Cleaning"],
-  "Beauty & Personal Care": ["Makeup", "Skincare", "Haircare", "Grooming"],
-  "Toys & Baby": ["Toys", "Baby Gear", "Clothing"],
-  "Grocery": ["Snacks", "Beverages", "Staples"],
-  "Sports": ["Fitness", "Outdoor"],
-  "Books": ["Fiction", "Academic", "Stationery"]
+  "Mobiles & Accessories": ["Smartphones", "Cases & Covers", "Power Banks", "Chargers", "Screen Protectors"],
+  "Computers & Laptops": ["Laptops", "Desktops", "Monitors", "Printers", "Storage", "Computer Accessories"],
+  "TV & Home Entertainment": ["Televisions", "Home Audio", "Projectors", "Streaming Devices"],
+  "Men's Fashion": ["T-Shirts", "Shirts", "Jeans", "Trousers", "Shoes", "Watches", "Accessories", "Innerwear"],
+  "Women's Fashion": ["Dresses", "Tops & Tees", "Kurtas", "Sarees", "Jeans", "Shoes", "Jewellery", "Handbags"],
+  "Kids' Fashion": ["Boys' Clothing", "Girls' Clothing", "Baby Clothing", "Kids' Shoes", "School Supplies"],
+  "Home & Kitchen": ["Kitchen & Dining", "Furniture", "Home Decor", "Bedding", "Storage & Organization", "Lighting"],
+  "Beauty & Grooming": ["Makeup", "Skincare", "Haircare", "Fragrances", "Men's Grooming", "Personal Care"],
+  "Sports & Fitness": ["Cricket", "Badminton", "Football", "Gym & Fitness", "Cycling", "Camping & Hiking"],
+  "Toys & Games": ["Action Figures", "Board Games", "Dolls", "Puzzles", "Remote Control Toys", "Learning Toys"],
+  "Appliances": ["Washing Machines", "Refrigerators", "Air Conditioners", "Microwaves", "Small Appliances"],
+  "Books": ["Fiction", "Non-Fiction", "Academic", "Children's Books", "Self-Help"],
+  "Grocery & Gourmet": ["Staples", "Snacks & Beverages", "Packaged Food", "Household Supplies"],
+  "Automotive": ["Car Accessories", "Bike Accessories", "Car Care", "Helmets & Gear"],
+  "Pet Supplies": ["Dog Supplies", "Cat Supplies", "Fish & Aquatic", "Birds"],
+  "Health & Personal Care": ["Nutrition", "Health Monitors", "First Aid", "Masks & Sanitizers"]
 };
 
 // --- Helper: Convert Object Map to Array ---

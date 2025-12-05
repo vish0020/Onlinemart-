@@ -94,7 +94,8 @@ export const reducer = (state: AppState, action: Action): AppState => {
 const AppContext = createContext<{ 
   state: AppState; 
   dispatch: React.Dispatch<Action>;
-  setShowLoginModal: (show: boolean) => void; // Kept as no-op to prevent breakages in other files if any
+  showLoginModal: boolean;
+  setShowLoginModal: (show: boolean) => void;
   pendingRedirect: string | null;
   setPendingRedirect: (path: string | null) => void;
 } | null>(null);
@@ -108,14 +109,13 @@ export const useAppContext = () => {
 export const AppProvider = ({ children }: PropsWithChildren) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
-
-  // No-op function for compatibility
-  const setShowLoginModal = (show: boolean) => {};
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   return (
     <AppContext.Provider value={{ 
       state, 
       dispatch, 
+      showLoginModal,
       setShowLoginModal,
       pendingRedirect,
       setPendingRedirect

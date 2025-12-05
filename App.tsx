@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, LogIn, ChevronRight, LogOut, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
@@ -273,11 +274,10 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
 
 // --- Main App Content ---
 const AppContent = () => {
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, showLoginModal, setShowLoginModal } = useAppContext();
     const navigate = useNavigate();
     const location = useLocation();
     const [showSearch, setShowSearch] = useState(false);
-    const [showLoginModal, setShowLoginModal] = useState(false);
 
     const isAdmin = state.user?.isAdmin;
     const isAdminRoute = location.pathname.startsWith('/admin');

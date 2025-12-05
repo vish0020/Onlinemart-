@@ -5,7 +5,7 @@ import {
   CheckCircle, Search, Mic, Loader, Moon, Sun, 
   Smartphone, Shirt, Home, Sparkles, Gamepad2, Gift, 
   ShoppingBasket, Wrench, Dumbbell, BookOpen, Zap, 
-  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck, LogOut
+  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck, LogOut, Laptop, Tv, Car, Smile
 } from 'lucide-react';
 import { Product, CartItem, Order, DeliverySettings, Review, Address } from '../types';
 import { Button, Input, ProductCard, Skeleton, ProductSkeleton, AddressForm, Logo } from '../components/Shared';
@@ -14,21 +14,22 @@ import { useAppContext } from '../Context';
 
 // --- CATEGORY ICONS ---
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  "Electronics": <Smartphone />,
-  "Fashion": <Shirt />,
+  "Mobiles & Accessories": <Smartphone />,
+  "Computers & Laptops": <Laptop />,
+  "TV & Home Entertainment": <Tv />,
+  "Men's Fashion": <Shirt />,
+  "Women's Fashion": <ShoppingBag />,
+  "Kids' Fashion": <Smile />,
   "Home & Kitchen": <Home />,
-  "Beauty & Personal Care": <Sparkles />,
-  "Bags, Shoes & Accessories": <Briefcase />,
-  "Toys, Kids & Baby": <Gamepad2 />, 
-  "Grocery & Food": <ShoppingBasket />,
-  "Tools & Automotive": <Wrench />,
+  "Beauty & Grooming": <Sparkles />,
   "Sports & Fitness": <Dumbbell />,
-  "Pet Supplies": <PawPrint />,
-  "Books & Stationery": <BookOpen />,
+  "Toys & Games": <Gamepad2 />,
   "Appliances": <Zap />,
-  "Housekeeping & Cleaning": <Sparkles />, 
-  "Gifts & Seasonal": <Gift />,
-  "Gaming": <Gamepad2 />
+  "Books": <BookOpen />,
+  "Grocery & Gourmet": <ShoppingBasket />,
+  "Automotive": <Car />,
+  "Pet Supplies": <PawPrint />,
+  "Health & Personal Care": <Heart />
 };
 
 // --- Helper Functions ---
@@ -346,7 +347,7 @@ const OrderDetailsModal = ({ order, onClose, onRefresh, onSubmitReview }: { orde
 };
 
 export const HomePage = () => {
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, setShowLoginModal } = useAppContext();
     const [recentItems, setRecentItems] = useState<Product[]>([]);
     const [showReviewPopup, setShowReviewPopup] = useState(false);
     const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
@@ -484,7 +485,19 @@ export const HomePage = () => {
     };
 
     const handleToggleWishlist = (id: string) => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
         dispatch({ type: 'TOGGLE_WISHLIST', payload: id });
+    };
+
+    const handleAddToCart = (product: Product) => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
+        dispatch({ type: 'ADD_TO_CART', payload: product });
     };
   
     const getProductsByCategory = (cat: string) => {
@@ -606,7 +619,7 @@ export const HomePage = () => {
                     product={product} 
                     isWishlisted={state.wishlist.includes(product.id)}
                     onToggleWishlist={() => handleToggleWishlist(product.id)}
-                    onAdd={() => dispatch({ type: 'ADD_TO_CART', payload: product })}
+                    onAdd={() => handleAddToCart(product)}
                     onClick={() => handleProductClick(product)}
                   />
                 ))
@@ -624,26 +637,26 @@ export const HomePage = () => {
         {/* Extra Categories Sections */}
         {!state.searchQuery && (
           <div className="space-y-8 animate-slide-up">
-              {getProductsByCategory('Electronics').length > 0 && (
+              {getProductsByCategory('Mobiles & Accessories').length > 0 && (
                   <div>
-                      <SectionHeader title="Best in Electronics" onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: 'Electronics' })} />
+                      <SectionHeader title="Top Mobiles" onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: 'Mobiles & Accessories' })} />
                       <HorizontalProductList 
-                          products={getProductsByCategory('Electronics')}
+                          products={getProductsByCategory('Mobiles & Accessories')}
                           onProductClick={handleProductClick}
-                          onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
+                          onAdd={handleAddToCart}
                           wishlist={state.wishlist}
                           onToggleWishlist={handleToggleWishlist}
                       />
                   </div>
               )}
   
-              {getProductsByCategory('Fashion').length > 0 && (
+              {getProductsByCategory('Men\'s Fashion').length > 0 && (
                   <div>
-                      <SectionHeader title="Trending Fashion" onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: 'Fashion' })} />
+                      <SectionHeader title="Men's Fashion" onSeeAll={() => dispatch({ type: 'SET_SEARCH', payload: 'Men\'s Fashion' })} />
                       <HorizontalProductList 
-                          products={getProductsByCategory('Fashion')}
+                          products={getProductsByCategory('Men\'s Fashion')}
                           onProductClick={handleProductClick}
-                          onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
+                          onAdd={handleAddToCart}
                           wishlist={state.wishlist}
                           onToggleWishlist={handleToggleWishlist}
                       />
@@ -656,7 +669,7 @@ export const HomePage = () => {
                       <HorizontalProductList 
                           products={getProductsByCategory('Home & Kitchen')}
                           onProductClick={handleProductClick}
-                          onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
+                          onAdd={handleAddToCart}
                           wishlist={state.wishlist}
                           onToggleWishlist={handleToggleWishlist}
                       />
@@ -672,7 +685,7 @@ export const HomePage = () => {
               <HorizontalProductList 
                   products={generateRepeatedList(recentItems)}
                   onProductClick={handleProductClick}
-                  onAdd={(p: Product) => dispatch({ type: 'ADD_TO_CART', payload: p })}
+                  onAdd={handleAddToCart}
                   wishlist={state.wishlist}
                   onToggleWishlist={handleToggleWishlist}
               />
@@ -685,7 +698,7 @@ export const HomePage = () => {
 export const ProductDetailsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, setShowLoginModal } = useAppContext();
     const product = state.products.find(p => p.id === id);
     const [activeImg, setActiveImg] = useState(0);
     const [reviews, setReviews] = useState<Review[]>([]);
@@ -742,7 +755,19 @@ export const ProductDetailsPage = () => {
     };
 
     const handleToggleWishlist = (id: string) => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
         dispatch({ type: 'TOGGLE_WISHLIST', payload: id });
+    };
+
+    const handleWriteReview = () => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
+        setShowReviewModal(true);
     };
   
     const handleSubmitReview = async (reviewData: any) => {
@@ -848,9 +873,24 @@ export const ProductDetailsPage = () => {
     }
 
     const handleBuyNow = () => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
         if (product) {
             dispatch({ type: 'ADD_TO_CART', payload: product });
             navigate('/checkout');
+        }
+    }
+
+    const handleAddToCart = () => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
+        if (product) {
+            dispatch({ type: 'ADD_TO_CART', payload: product });
+            if (navigator.vibrate) navigator.vibrate(50);
         }
     }
   
@@ -1008,10 +1048,7 @@ export const ProductDetailsPage = () => {
               </Button>
               <Button 
                   variant="secondary"
-                  onClick={() => {
-                      dispatch({ type: 'ADD_TO_CART', payload: product });
-                      if (navigator.vibrate) navigator.vibrate(50);
-                  }} 
+                  onClick={handleAddToCart} 
                   className="w-full rounded-full bg-black text-white hover:bg-gray-900 border-none font-bold"
               >
                   Add to Cart
@@ -1051,7 +1088,7 @@ export const ProductDetailsPage = () => {
           <div className="border-t border-b dark:border-gray-800 py-3 mb-4">
               <h4 className="font-bold text-sm mb-2 dark:text-white">Review this product</h4>
               <p className="text-xs text-gray-500 mb-3">Share your thoughts with other customers</p>
-              <Button size="sm" variant="outline" className="w-full" onClick={() => setShowReviewModal(true)}>Write a customer review</Button>
+              <Button size="sm" variant="outline" className="w-full" onClick={handleWriteReview}>Write a customer review</Button>
           </div>
   
           <div className="space-y-6">
@@ -1089,7 +1126,7 @@ export const ProductDetailsPage = () => {
 };
 
 export const CartPage = () => {
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, setShowLoginModal } = useAppContext();
     const navigate = useNavigate();
 
     const subtotal = state.cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -1097,6 +1134,14 @@ export const CartPage = () => {
     const isFree = subtotal >= settings.freeDeliveryAbove;
     const shipping = isFree ? 0 : settings.baseCharge;
     const total = subtotal + shipping;
+
+    const handleProceedToBuy = () => {
+        if (!state.user) {
+            setShowLoginModal(true);
+            return;
+        }
+        navigate('/checkout');
+    };
 
     if (state.cart.length === 0) {
         return (
@@ -1175,7 +1220,7 @@ export const CartPage = () => {
                         <p className="text-xs text-gray-500">Total</p>
                         <p className="font-bold text-xl dark:text-white">₹{total}</p>
                     </div>
-                    <Button onClick={() => navigate('/checkout')} className="flex-1 py-3 text-base">Proceed to Buy</Button>
+                    <Button onClick={handleProceedToBuy} className="flex-1 py-3 text-base">Proceed to Buy</Button>
                 </div>
             </div>
         </div>
@@ -1365,7 +1410,7 @@ export const CheckoutPage = () => {
 };
 
 export const ProfilePage = () => {
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, setShowLoginModal } = useAppContext();
     const navigate = useNavigate();
     const [orders, setOrders] = useState<Order[]>([]);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -1382,6 +1427,23 @@ export const ProfilePage = () => {
         if (!user) return;
         const data = await api.getOrders(false, user.id);
         setOrders(data);
+    };
+    
+    // Wishlist Logic
+    const wishlistProducts = useMemo(() => {
+        return state.products.filter(p => state.wishlist.includes(p.id));
+    }, [state.products, state.wishlist]);
+
+    const handleProductClick = (product: Product) => {
+      navigate(`/product/${product.id}`);
+    };
+
+    const handleToggleWishlist = (id: string) => {
+        dispatch({ type: 'TOGGLE_WISHLIST', payload: id });
+    };
+
+    const handleAddToCart = (product: Product) => {
+        dispatch({ type: 'ADD_TO_CART', payload: product });
     };
     
     // Admin Toggle Logic (Only for UI demo purposes in this context, real logic in mockService)
@@ -1501,17 +1563,41 @@ export const ProfilePage = () => {
                                     </div>
                                     <div>
                                         <p className="font-bold text-sm dark:text-white">#{order.id.slice(-6)}</p>
-                                        <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()} • {order.items.length} Items</p>
+                                        <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</p>
                                         <p className={`text-xs font-bold mt-1 ${order.status === 'Delivered' ? 'text-green-600' : order.status === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'}`}>
                                             {order.status}
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronRight size={16} className="text-gray-400" />
+                                <div className="text-right">
+                                    <p className="text-xs text-gray-400">{order.items.length} Items</p>
+                                    <ChevronRight size={16} className="text-gray-400 ml-auto" />
+                                </div>
                             </div>
                         ))}
                     </div>
                  )}
+            </div>
+
+            {/* Wishlist Section */}
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold dark:text-white flex items-center gap-2"><Heart size={20}/> My Wishlist ({wishlistProducts.length})</h2>
+                </div>
+                {wishlistProducts.length === 0 ? (
+                    <div className="text-center py-6 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700">
+                        <p className="text-gray-500 text-sm">Your wishlist is empty.</p>
+                        <Button variant="ghost" onClick={() => navigate('/')} className="text-primary mt-1 text-xs">Browse Products</Button>
+                    </div>
+                ) : (
+                    <HorizontalProductList 
+                        products={wishlistProducts}
+                        onProductClick={handleProductClick}
+                        onAdd={handleAddToCart}
+                        wishlist={state.wishlist}
+                        onToggleWishlist={handleToggleWishlist}
+                    />
+                )}
             </div>
 
             {/* Addresses Section */}
