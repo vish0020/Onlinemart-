@@ -1,53 +1,77 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, DollarSign, Users, Trash2, Edit2, Plus, Save, XCircle, Filter, Star, Layout, ArrowUp, ArrowDown, X, AlertOctagon, Eye, EyeOff, Video, Info, MapPin, Box, ClipboardList, Layers, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Product, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Location } from '../types';
-import { api, PRODUCT_CATEGORIES } from '../services/mockService';
+import { Package, DollarSign, Users, Trash2, Edit2, Plus, Save, XCircle, Filter, Star, Layout, ArrowUp, ArrowDown, X, AlertOctagon, Eye, EyeOff, Video, Info, MapPin, Box, ClipboardList, Layers, LayoutDashboard, ChevronLeft, ChevronRight, TrendingUp, AlertTriangle, ExternalLink, Sliders, QrCode } from 'lucide-react';
+import { Product, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Location, PaymentSettings } from '../types';
+import { api, CATEGORY_DATA } from '../services/mockService';
 import { Button, Input } from '../components/Shared';
 import { MapPicker } from '../components/MapPicker';
 import { useAppContext } from '../Context';
-import { DEFAULT_STORE_LOCATION } from '../constants';
+import { DEFAULT_STORE_LOCATION, DEFAULT_PAYMENT_SETTINGS } from '../constants';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
 
 export const AdminDashboard = () => {
     const { state } = useAppContext();
     const [stats, setStats] = useState({ revenue: 0, orders: 0, users: 12 });
     const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+    const [chartData, setChartData] = useState<any[]>([]);
+    const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
     
     useEffect(() => {
         api.getOrders(true).then(orders => {
             setRecentOrders(orders.slice(0, 5));
             const revenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
             setStats(s => ({ ...s, revenue, orders: orders.length }));
+
+            // Process data for charts (Last 7 days)
+            const days = Array.from({length: 7}, (_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                return d.toISOString().split('T')[0];
+            }).reverse();
+
+            const data = days.map(day => {
+                const dayOrders = orders.filter(o => o.createdAt.startsWith(day));
+                return {
+                    name: new Date(day).toLocaleDateString('en-US', {weekday: 'short'}),
+                    sales: dayOrders.reduce((acc, o) => acc + o.totalAmount, 0),
+                    orders: dayOrders.length
+                };
+            });
+            setChartData(data);
+        });
+
+        api.getProducts().then(products => {
+            setLowStockProducts(products.filter(p => p.stock < 5));
         });
     }, []);
 
     return (
-        <div className="p-6 space-y-6 pb-20 dark:text-gray-100">
+        <div className="p-6 space-y-6 pb-20 dark:text-gray-100 animate-fade-in">
             <h1 className="text-3xl font-bold">Admin Dashboard</h1>
 
             {/* Navigation Grid for Mobile/Tablet */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                 <Link to="/admin/products" className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors shadow-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up">
+                 <Link to="/admin/products" className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all hover:scale-105 shadow-sm">
                      <Box size={24} />
                      <span className="font-bold text-sm">Products</span>
                  </Link>
-                 <Link to="/admin/orders" className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300 border border-yellow-100 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors shadow-sm">
+                 <Link to="/admin/orders" className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-yellow-700 dark:text-yellow-300 border border-yellow-100 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-all hover:scale-105 shadow-sm">
                      <ClipboardList size={24} />
                      <span className="font-bold text-sm">Orders</span>
                  </Link>
-                 <Link to="/admin/content" className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors shadow-sm">
+                 <Link to="/admin/content" className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-all hover:scale-105 shadow-sm">
                      <Layers size={24} />
                      <span className="font-bold text-sm">Content</span>
                  </Link>
-                 <Link to="/" className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-sm">
-                     <LayoutDashboard size={24} />
-                     <span className="font-bold text-sm">Store Front</span>
+                 <Link to="/admin/settings" className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl flex flex-col items-center justify-center gap-2 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40 transition-all hover:scale-105 shadow-sm">
+                     <QrCode size={24} />
+                     <span className="font-bold text-sm">Payment Settings</span>
                  </Link>
             </div>
 
             <h2 className="text-lg font-bold mt-8 mb-2">Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center gap-4 border border-gray-100 dark:border-gray-700">
                     <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-full text-primary-dark"><DollarSign /></div>
                     <div><p className="text-sm text-gray-500">Total Revenue</p><p className="text-2xl font-bold">₹{stats.revenue}</p></div>
@@ -62,7 +86,48 @@ export const AdminDashboard = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                {/* Sales Chart */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 h-80">
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-sm"><TrendingUp size={18}/> Sales (Last 7 Days)</h3>
+                    <ResponsiveContainer width="100%" height="90%">
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="name" fontSize={12} />
+                            <YAxis fontSize={12} />
+                            <Tooltip 
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                            />
+                            <Bar dataKey="sales" fill="#FFD700" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Inventory Alert */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 h-80 overflow-y-auto">
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-sm text-red-600"><AlertTriangle size={18}/> Low Stock Alert</h3>
+                    {lowStockProducts.length === 0 ? (
+                        <p className="text-green-600 text-sm text-center py-10">All products are well stocked.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {lowStockProducts.map(p => (
+                                <div key={p.id} className="flex justify-between items-center p-2 bg-red-50 dark:bg-red-900/10 rounded-lg">
+                                    <div className="flex items-center gap-3">
+                                        <img src={p.images[0]} className="w-8 h-8 rounded object-cover" />
+                                        <div>
+                                            <p className="text-sm font-bold dark:text-white line-clamp-1">{p.name}</p>
+                                            <p className="text-xs text-gray-500">Stock: {p.stock}</p>
+                                        </div>
+                                    </div>
+                                    <Link to="/admin/products" className="text-xs font-bold text-blue-500 hover:underline">Restock</Link>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700 animate-slide-up" style={{ animationDelay: '0.3s' }}>
                 <div className="p-4 border-b dark:border-gray-700 font-bold flex justify-between items-center">
                     <span>Recent Orders</span>
                     <Link to="/admin/orders" className="text-xs text-primary font-bold">View All</Link>
@@ -91,7 +156,7 @@ export const AdminDashboard = () => {
 };
 
 export const AdminProducts = () => {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, showToast } = useAppContext();
   const [editing, setEditing] = useState<Product | null>(null);
   const [tempImage, setTempImage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -101,8 +166,9 @@ export const AdminProducts = () => {
       try {
         await api.deleteProduct(id);
         dispatch({type: 'DELETE_PRODUCT', payload: id});
+        showToast("Product deleted", "info");
       } catch (error) {
-        alert("Failed to delete. You might not have permission.");
+        showToast("Failed to delete", "error");
       }
     }
   };
@@ -112,13 +178,12 @@ export const AdminProducts = () => {
     if (!editing) return;
 
     if (state.user?.id === 'demo_admin_user') {
-        alert("DEMO MODE: You cannot save changes to the real database. Please login with the real admin account (onlinemart0020@gmail.com) to manage the store.");
+        showToast("Demo Mode: Cannot save changes", "error");
         return;
     }
 
     setIsSaving(true);
     try {
-        // Generate a cleaner ID if new
         const newId = editing.id || `p_${Date.now()}`;
         const product = { ...editing, id: newId };
         
@@ -127,9 +192,10 @@ export const AdminProducts = () => {
         const all = await api.getProducts();
         dispatch({type: 'SET_PRODUCTS', payload: all});
         setEditing(null);
+        showToast("Product Saved Successfully", "success");
     } catch (error: any) {
         console.error("Save Error:", error);
-        alert(`Failed to save product. Error: ${error.message || "Permission Denied"}`);
+        showToast("Failed to save product", "error");
     } finally {
         setIsSaving(false);
     }
@@ -149,13 +215,30 @@ export const AdminProducts = () => {
       }
   };
 
-  const calculateDiscount = () => {
-      if (!editing || !editing.originalPrice || editing.originalPrice <= editing.price) return 0;
-      return Math.round(((editing.originalPrice - editing.price) / editing.originalPrice) * 100);
+  const handleAttributeChange = (key: string, value: string) => {
+      if (!editing) return;
+      setEditing({
+          ...editing,
+          attributes: {
+              ...editing.attributes,
+              [key]: value
+          }
+      });
   };
 
+  // Get dynamic fields based on selected category
+  const dynamicFields = useMemo(() => {
+      if (!editing || !editing.category) return [];
+      return CATEGORY_DATA[editing.category]?.fields || [];
+  }, [editing?.category]);
+
+  const availableSubcategories = useMemo(() => {
+      if (!editing || !editing.category) return [];
+      return CATEGORY_DATA[editing.category]?.subcategories || [];
+  }, [editing?.category]);
+
   return (
-    <div className="p-6 pb-20">
+    <div className="p-6 pb-20 animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
             <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
@@ -163,21 +246,21 @@ export const AdminProducts = () => {
         </div>
         <Button onClick={() => {
             setEditing({
-                id: '', name: '', price: 0, originalPrice: 0, description: '', category: '', subcategory: '', images: ['https://picsum.photos/200'], stock: 10, rating: 0, reviewCount: 0, video: ''
+                id: '', name: '', price: 0, originalPrice: 0, description: '', features: '', category: '', subcategory: '', images: ['https://picsum.photos/200'], stock: 10, rating: 0, reviewCount: 0, video: '', attributes: {}
             });
             setTempImage('');
         }}><Plus size={20}/> <span className="hidden sm:inline">Add Product</span></Button>
       </div>
 
       {editing && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
           <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 p-6 rounded-xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
             <h2 className="text-xl font-bold dark:text-white">{editing.id ? 'Edit' : 'New'} Product</h2>
             <Input placeholder="Name" value={editing.name} onChange={e => setEditing({...editing, name: e.target.value})} required />
             
             <div className="grid grid-cols-3 gap-3">
               <div>
-                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">Selling Price (₹)</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">Price (₹)</label>
                   <Input type="number" placeholder="Price" value={editing.price} onChange={e => setEditing({...editing, price: Number(e.target.value)})} required />
               </div>
               <div>
@@ -185,16 +268,10 @@ export const AdminProducts = () => {
                   <Input type="number" placeholder="MRP" value={editing.originalPrice || ''} onChange={e => setEditing({...editing, originalPrice: Number(e.target.value)})} />
               </div>
               <div>
-                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">Stock Qty</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">Stock</label>
                   <Input type="number" placeholder="Stock" value={editing.stock} onChange={e => setEditing({...editing, stock: Number(e.target.value)})} required />
               </div>
             </div>
-
-            {editing.originalPrice && editing.originalPrice > editing.price && (
-                <div className="text-sm font-medium text-green-600 dark:text-green-400">
-                    Customer gets <span className="font-bold">{calculateDiscount()}% OFF</span>
-                </div>
-            )}
             
             <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -202,11 +279,11 @@ export const AdminProducts = () => {
                     <select 
                         className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-3 outline-none dark:text-white"
                         value={editing.category}
-                        onChange={e => setEditing({...editing, category: e.target.value, subcategory: ''})}
+                        onChange={e => setEditing({...editing, category: e.target.value, subcategory: '', attributes: {}})}
                         required
                     >
                         <option value="">Select Category</option>
-                        {Object.keys(PRODUCT_CATEGORIES).map(cat => (
+                        {Object.keys(CATEGORY_DATA).map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                         ))}
                     </select>
@@ -220,23 +297,42 @@ export const AdminProducts = () => {
                         disabled={!editing.category}
                     >
                         <option value="">Select Subcategory</option>
-                        {editing.category && PRODUCT_CATEGORIES[editing.category]?.map(sub => (
+                        {availableSubcategories.map(sub => (
                             <option key={sub} value={sub}>{sub}</option>
                         ))}
                     </select>
                 </div>
             </div>
 
-            {/* Image Management */}
+            {/* Dynamic Fields Section */}
+            {dynamicFields.length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg border dark:border-gray-600 space-y-3">
+                    <h3 className="font-bold text-sm flex items-center gap-2 dark:text-white"><Sliders size={16}/> Product Specifications</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                        {dynamicFields.map(field => (
+                            <div key={field}>
+                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">{field}</label>
+                                <Input 
+                                    placeholder={field} 
+                                    value={editing.attributes?.[field] || ''} 
+                                    onChange={e => handleAttributeChange(field, e.target.value)}
+                                    className="py-2 text-sm"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-2">
-                <label className="text-xs font-bold dark:text-gray-300">Product Images</label>
+                <label className="text-xs font-bold dark:text-gray-300">Images</label>
                 <div className="flex gap-2">
                     <Input 
-                        placeholder="Add Image URL (https://...)" 
+                        placeholder="Image URL" 
                         value={tempImage} 
                         onChange={e => setTempImage(e.target.value)} 
                     />
-                    <Button type="button" onClick={handleAddImage} className="whitespace-nowrap">Add</Button>
+                    <Button type="button" onClick={handleAddImage}>Add</Button>
                 </div>
                 <div className="flex gap-2 overflow-x-auto p-1">
                     {editing.images.map((img, idx) => (
@@ -251,27 +347,21 @@ export const AdminProducts = () => {
                             </button>
                         </div>
                     ))}
-                    {editing.images.length === 0 && <span className="text-xs text-gray-500 italic">No images added</span>}
                 </div>
             </div>
 
-            {/* Video Input */}
-            <div>
-                <label className="text-xs font-bold dark:text-gray-300 flex items-center gap-1 mb-1">
-                    <Video size={12}/> Video URL (Optional)
-                </label>
-                <Input 
-                    placeholder="Video Link (YouTube, MP4, etc.)" 
-                    value={editing.video || ''} 
-                    onChange={e => setEditing({...editing, video: e.target.value})} 
-                />
-            </div>
-
             <textarea 
-              className="w-full border rounded p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600" 
+              className="w-full border rounded p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600 min-h-[80px]" 
               placeholder="Description" 
               value={editing.description} 
               onChange={e => setEditing({...editing, description: e.target.value})}
+            ></textarea>
+
+            <textarea 
+              className="w-full border rounded p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600 min-h-[80px]" 
+              placeholder="Features (Optional additional text)" 
+              value={editing.features || ''} 
+              onChange={e => setEditing({...editing, features: e.target.value})}
             ></textarea>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -283,18 +373,16 @@ export const AdminProducts = () => {
       )}
 
       <div className="grid gap-4">
-        {state.products.length === 0 && <p className="text-center text-gray-500 py-10">No products found. Add one to get started.</p>}
         {state.products.map(p => (
-          <div key={p.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg flex items-center gap-4 shadow-sm border dark:border-gray-700">
+          <div key={p.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg flex items-center gap-4 shadow-sm border dark:border-gray-700 animate-slide-up hover:shadow-md transition-shadow">
              <img src={p.images[0]} className="w-16 h-16 rounded object-cover bg-gray-100" alt="" />
              <div className="flex-1">
                <h3 className="font-bold dark:text-white line-clamp-1">{p.name}</h3>
                <div className="text-sm text-gray-500 flex items-center gap-2">
                    <span className="font-medium text-black dark:text-white">₹{p.price}</span>
-                   {p.originalPrice && <span className="line-through text-xs">₹{p.originalPrice}</span>}
                    <span className="hidden sm:inline">• {p.category}</span>
+                   {p.stock < 5 && <span className="text-red-500 text-xs font-bold bg-red-50 px-1 rounded">Low Stock: {p.stock}</span>}
                </div>
-               {p.video && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold mt-1 inline-block">VIDEO</span>}
              </div>
              <div className="flex gap-2">
                <button onClick={() => { setEditing(p); setTempImage(''); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"><Edit2 size={18}/></button>
@@ -308,453 +396,352 @@ export const AdminProducts = () => {
 };
 
 export const AdminOrdersPage = () => {
-    const { state } = useAppContext();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-
-  useEffect(() => {
-    loadOrders();
-  }, []);
-
-  const loadOrders = () => {
-    api.getOrders(true).then(orders => {
-        setOrders(orders.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    });
-  }
-
-  const updateStatus = async (id: string, status: OrderStatus) => {
-    if (status === 'Cancelled' && !confirm('Are you sure you want to cancel this order? User will be notified.')) return;
-    
-    await api.updateOrderStatus(id, status);
-    loadOrders();
-    if (selectedOrder?.id === id) {
-        setSelectedOrder(prev => prev ? {...prev, status} : null);
-    }
-  };
-
-  const handleRejectCancellation = async (id: string) => {
-      await api.rejectOrderCancellation(id);
-      loadOrders();
-      if (selectedOrder?.id === id) {
-          setSelectedOrder(prev => prev && prev.cancelRequest ? {...prev, cancelRequest: {...prev.cancelRequest, status: 'rejected'}} : null);
-      }
-  };
-
-  return (
-    <div className="p-4 pb-24">
-      <div className="flex items-center gap-2 mb-6">
-          <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
-          <h1 className="text-2xl font-bold dark:text-white">Order Management</h1>
-      </div>
-      
-      <div className="space-y-4">
-        {orders.length === 0 && <p className="text-gray-500 text-center py-10">No orders yet.</p>}
-        {orders.map(order => (
-          <div key={order.id} onClick={() => setSelectedOrder(order)} className={`bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden ${order.cancelRequest?.status === 'pending' ? 'border-red-500 border-2' : 'border-gray-100 dark:border-gray-700'}`}>
-            {order.cancelRequest?.status === 'pending' && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 font-bold rounded-bl-lg">Cancellation Requested</div>}
-            
-            <div className="flex justify-between items-start mb-2">
-               <div>
-                  <span className="font-bold dark:text-white block">#{order.id.slice(-6)}</span>
-                  <span className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString()}</span>
-               </div>
-               <span className={`px-2 py-1 rounded text-xs font-bold ${
-                 order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 
-                 order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 
-                 'bg-yellow-100 text-yellow-800'
-               }`}>
-                 {order.status}
-               </span>
-            </div>
-            <div className="text-sm dark:text-gray-300 mb-2">
-               <p className="font-semibold">{order.shippingAddress.fullName}</p>
-               <p className="text-gray-500 text-xs">{order.items.length} items</p>
-            </div>
-            <div className="flex justify-between items-center border-t dark:border-gray-700 pt-2 mt-2">
-               <span className="font-bold text-primary-dark dark:text-primary">₹{order.totalAmount}</span>
-               <span className="text-xs text-blue-500 font-medium flex items-center gap-1">View Details <ChevronRight size={14}/></span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelectedOrder(null)}>
-           <div className="bg-white dark:bg-gray-800 w-full max-w-lg sm:rounded-2xl rounded-t-2xl p-6 relative max-h-[90vh] overflow-y-auto animate-slide-up" onClick={e => e.stopPropagation()}>
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4 sm:hidden"></div>
-              <button onClick={() => setSelectedOrder(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 hidden sm:block"><XCircle/></button>
-              
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-2">
-                    <h2 className="text-xl font-bold dark:text-white">Order Details</h2>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        selectedOrder.status === 'Delivered' ? 'bg-green-100 text-green-700' : 
-                        selectedOrder.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 
-                        'bg-yellow-100 text-yellow-800'
-                    }`}>{selectedOrder.status}</span>
-                </div>
-                <p className="text-sm text-gray-500">ID: {selectedOrder.id}</p>
-              </div>
-
-              {selectedOrder.cancelRequest && selectedOrder.status !== 'Cancelled' && (
-                  <div className="mb-6 bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-900">
-                      <div className="flex items-start gap-3">
-                          <AlertOctagon className="text-red-500 shrink-0 mt-1" />
-                          <div>
-                              <h3 className="font-bold text-red-700 dark:text-red-400">Cancellation Request</h3>
-                              <p className="text-sm dark:text-gray-300 mt-1">Reason: "{selectedOrder.cancelRequest.reason}"</p>
-                              <p className="text-xs text-gray-500 mt-1">Requested: {new Date(selectedOrder.cancelRequest.requestedAt).toLocaleString()}</p>
-                              
-                              {selectedOrder.cancelRequest.status === 'pending' ? (
-                                  <div className="flex gap-2 mt-3">
-                                      <Button size="sm" onClick={() => updateStatus(selectedOrder.id, 'Cancelled')} className="bg-red-600 text-white hover:bg-red-700 border-none">Approve & Cancel</Button>
-                                      <Button size="sm" variant="outline" onClick={() => handleRejectCancellation(selectedOrder.id)}>Reject Request</Button>
-                                  </div>
-                              ) : (
-                                  <div className="mt-2 text-sm font-bold text-red-800 dark:text-red-300">
-                                      Request {selectedOrder.cancelRequest.status.toUpperCase()}
-                                  </div>
-                              )}
-                          </div>
-                      </div>
-                  </div>
-              )}
-
-              <div className="space-y-6">
-                  {/* Customer Info */}
-                  <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl space-y-2">
-                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Customer Information</h3>
-                      <div>
-                          <p className="font-bold dark:text-white text-lg">{selectedOrder.shippingAddress.fullName}</p>
-                          <p className="dark:text-gray-300">{selectedOrder.shippingAddress.line1}</p>
-                          <p className="dark:text-gray-300">{selectedOrder.shippingAddress.city} - {selectedOrder.shippingAddress.pincode}</p>
-                          <div className="flex items-center gap-2 mt-2 text-blue-600 bg-blue-50 dark:bg-blue-900/30 w-fit px-2 py-1 rounded text-sm">
-                             <span>📞 {selectedOrder.shippingAddress.phone}</span>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Order Items */}
-                  <div>
-                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Order Items</h3>
-                      <div className="space-y-3">
-                          {selectedOrder.items.map(item => (
-                              <div key={item.id} className="flex justify-between items-center">
-                                  <div className="flex gap-3">
-                                      <img src={item.images[0]} className="w-12 h-12 rounded bg-gray-100 object-cover" />
-                                      <div>
-                                          <p className="font-medium text-sm dark:text-white line-clamp-1">{item.name}</p>
-                                          <p className="text-xs text-gray-500">{item.quantity} x ₹{item.price}</p>
-                                      </div>
-                                  </div>
-                                  <p className="font-bold text-sm dark:text-white">₹{item.price * item.quantity}</p>
-                              </div>
-                          ))}
-                      </div>
-                      <div className="border-t dark:border-gray-700 mt-4 pt-3 flex justify-between font-bold text-lg dark:text-white">
-                          <span>Total Amount</span>
-                          <span>₹{selectedOrder.totalAmount}</span>
-                      </div>
-                      <p className="text-xs text-gray-400 text-right mt-1">Payment: {selectedOrder.paymentMethod}</p>
-                  </div>
-
-                  {/* Actions */}
-                  {selectedOrder.status !== 'Cancelled' && selectedOrder.status !== 'Delivered' && !selectedOrder.cancelRequest && (
-                      <div className="space-y-3 pt-4 border-t dark:border-gray-700">
-                          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Update Status</h3>
-                          <div className="grid grid-cols-2 gap-3">
-                              {selectedOrder.status === 'Ordered' && (
-                                  <Button variant="outline" onClick={() => updateStatus(selectedOrder.id, 'Shipped')}>Mark Shipped</Button>
-                              )}
-                              {selectedOrder.status === 'Shipped' && (
-                                  <Button variant="outline" onClick={() => updateStatus(selectedOrder.id, 'Out for Delivery')}>Mark Out for Delivery</Button>
-                              )}
-                              {selectedOrder.status === 'Out for Delivery' && (
-                                  <Button variant="outline" onClick={() => updateStatus(selectedOrder.id, 'Delivered')}>Mark Delivered</Button>
-                              )}
-                              
-                              <Button 
-                                className="w-full bg-red-500 hover:bg-red-600 text-white border-none col-span-2" 
-                                onClick={() => updateStatus(selectedOrder.id, 'Cancelled')}
-                              >
-                                Cancel Order Forcefully
-                              </Button>
-                          </div>
-                      </div>
-                  )}
-              </div>
-           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export const AdminReviewsPage = () => {
-    // --- Unified Content Management Page (Reviews, Banners & Delivery) ---
-    const { state, dispatch } = useAppContext();
-    const [activeTab, setActiveTab] = useState<'reviews' | 'banners' | 'delivery'>('reviews');
-    
-    // Reviews State
-    const [reviews, setReviews] = useState<Review[]>([]);
-    const [filterRating, setFilterRating] = useState<number | 'all'>('all');
-    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
-
-    // Banners State
-    const [isAddingBanner, setIsAddingBanner] = useState(false);
-    const [newBanner, setNewBanner] = useState<HeroBanner>({ id: '', title: '', subtitle: '', imageUrl: '', link: '', isVisible: true });
-
-    // Delivery State
-    const [dSettings, setDSettings] = useState<DeliverySettings>(state.deliverySettings);
+    const { state, dispatch, showToast } = useAppContext();
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [filterStatus, setFilterStatus] = useState<OrderStatus | 'All'>('All');
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
     useEffect(() => {
-        api.getReviews().then(setReviews);
-        if (state.banners.length === 0) {
-             api.getBanners().then(b => dispatch({type: 'SET_BANNERS', payload: b}));
-        }
+        loadOrders();
     }, []);
 
-    useEffect(() => {
-        setDSettings(state.deliverySettings);
-    }, [state.deliverySettings]);
+    const loadOrders = async () => {
+        const data = await api.getOrders(true);
+        setOrders(data);
+    };
 
-    // Review Handlers
-    const handleDeleteReview = async (id: string) => {
-        if(confirm('Delete review?')) {
-            await api.deleteReview(id);
-            setReviews(reviews.filter(r => r.id !== id));
+    const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
+        try {
+            await api.updateOrderStatus(orderId, newStatus);
+            showToast(`Order status updated to ${newStatus}`, "success");
+            loadOrders();
+            if (selectedOrder && selectedOrder.id === orderId) {
+                setSelectedOrder({ ...selectedOrder, status: newStatus });
+            }
+        } catch (e) {
+            showToast("Failed to update status", "error");
         }
     };
 
-    const filteredReviews = reviews
-        .filter(r => filterRating === 'all' ? true : Math.round(r.rating) === filterRating)
-        .sort((a,b) => sortOrder === 'newest' 
-            ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-
-    // Banner Handlers
-    const handleSaveBanner = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const banner = { ...newBanner, id: newBanner.id || 'b_' + Date.now() };
-        await api.saveBanner(banner);
-        
-        const updatedBanners = await api.getBanners();
-        dispatch({type: 'SET_BANNERS', payload: updatedBanners});
-        
-        setNewBanner({ id: '', title: '', subtitle: '', imageUrl: '', link: '', isVisible: true });
-        setIsAddingBanner(false);
-    };
-
-    const toggleBannerVisibility = async (banner: HeroBanner) => {
-        const updated = { ...banner, isVisible: !banner.isVisible };
-        await api.saveBanner(updated);
-        const banners = await api.getBanners();
-        dispatch({ type: 'SET_BANNERS', payload: banners });
-    }
-
-    const handleDeleteBanner = async (id: string) => {
-        if(confirm('Delete this banner?')) {
-            await api.deleteBanner(id);
-            dispatch({type: 'DELETE_BANNER', payload: id});
+    const handleRejectCancel = async (orderId: string) => {
+        try {
+            await api.rejectOrderCancellation(orderId);
+            showToast("Cancellation request rejected", "success");
+            loadOrders();
+        } catch (e) {
+            showToast("Failed to reject cancellation", "error");
         }
     };
 
-    // Delivery Handlers
-    const saveDeliverySettings = async () => {
-        await api.saveDeliverySettings(dSettings);
-        dispatch({type: 'SET_SETTINGS', payload: dSettings});
-        alert('Settings Saved');
-    }
-
-    const handleStoreLocationSelect = (loc: Location) => {
-        setDSettings({...dSettings, storeLocation: loc});
-    }
+    const filteredOrders = filterStatus === 'All' ? orders : orders.filter(o => o.status === filterStatus);
 
     return (
-        <div className="p-6 pb-20">
+        <div className="p-6 pb-20 animate-fade-in">
              <div className="flex items-center gap-2 mb-6">
                 <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
-                <h1 className="text-2xl font-bold dark:text-white">Content Management</h1>
-            </div>
-            
-            <div className="flex gap-4 mb-6 border-b dark:border-gray-700 overflow-x-auto">
-                <button 
-                    onClick={() => setActiveTab('reviews')}
-                    className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'reviews' ? 'border-b-2 border-primary text-primary' : 'text-gray-500'}`}
-                >
-                    Customer Reviews
-                </button>
-                <button 
-                    onClick={() => setActiveTab('banners')}
-                    className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'banners' ? 'border-b-2 border-primary text-primary' : 'text-gray-500'}`}
-                >
-                    Hero Banners
-                </button>
-                 <button 
-                    onClick={() => setActiveTab('delivery')}
-                    className={`pb-2 px-1 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'delivery' ? 'border-b-2 border-primary text-primary' : 'text-gray-500'}`}
-                >
-                    Delivery Config
-                </button>
+                <h1 className="text-2xl font-bold dark:text-white">Order Management</h1>
             </div>
 
-            {activeTab === 'reviews' && (
-                <div className="space-y-4 animate-fade-in">
-                    {/* Filters */}
-                    <div className="flex flex-wrap gap-2 items-center mb-4 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm">
-                        <Filter size={16} className="text-gray-500"/>
-                        <span className="text-xs font-bold dark:text-gray-300">Filter:</span>
-                        {['all', 5, 4, 3, 2, 1].map(r => (
-                            <button 
-                                key={r}
-                                onClick={() => setFilterRating(r as any)}
-                                className={`px-2 py-1 rounded text-xs border ${filterRating === r ? 'bg-primary border-primary text-black' : 'bg-transparent border-gray-200 dark:border-gray-600 dark:text-gray-300'}`}
-                            >
-                                {r === 'all' ? 'All' : `${r} ★`}
-                            </button>
-                        ))}
-                        <div className="w-px h-4 bg-gray-300 mx-2"></div>
-                        <button onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')} className="flex items-center gap-1 text-xs dark:text-gray-300">
-                            {sortOrder === 'newest' ? <ArrowDown size={14}/> : <ArrowUp size={14}/>} 
-                            {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
-                        </button>
-                    </div>
+            {/* Filter Tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+                {['All', 'Ordered', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'].map(status => (
+                    <button
+                        key={status}
+                        onClick={() => setFilterStatus(status as any)}
+                        className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${filterStatus === status ? 'bg-primary text-black' : 'bg-white dark:bg-gray-800 border dark:border-gray-700 hover:bg-gray-50'}`}
+                    >
+                        {status}
+                    </button>
+                ))}
+            </div>
 
-                    {filteredReviews.length === 0 && <p className="text-gray-500">No reviews found.</p>}
-                    {filteredReviews.map(review => (
-                        <div key={review.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                            <div className="flex justify-between items-start">
-                                 <div className="flex gap-3">
-                                     <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold">
-                                         {review.userName[0]}
-                                     </div>
-                                     <div>
-                                         <p className="font-bold text-sm dark:text-white">{review.userName}</p>
-                                         <div className="flex text-yellow-500 my-0.5">
-                                             {Array(5).fill(0).map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />)}
-                                         </div>
-                                         <p className="text-gray-600 dark:text-gray-300 text-sm mt-1">{review.comment}</p>
-                                         <p className="text-xs text-gray-400 mt-1">{new Date(review.createdAt).toLocaleDateString()}</p>
-                                     </div>
-                                 </div>
-                                 <button onClick={() => handleDeleteReview(review.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+            <div className="space-y-4">
+                {filteredOrders.length === 0 && <p className="text-center py-10 text-gray-500">No orders found.</p>}
+                {filteredOrders.map(order => (
+                    <div key={order.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 animate-slide-up">
+                        <div className="flex justify-between items-start mb-4 border-b dark:border-gray-700 pb-3">
+                            <div>
+                                <p className="font-bold text-sm dark:text-white flex items-center gap-2">
+                                    #{order.id.slice(-6)}
+                                    {order.cancelRequest && order.cancelRequest.status === 'pending' && (
+                                        <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded animate-pulse">Cancel Requested</span>
+                                    )}
+                                </p>
+                                <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString()}</p>
                             </div>
+                            <select
+                                value={order.status}
+                                onChange={(e) => handleStatusUpdate(order.id, e.target.value as OrderStatus)}
+                                className={`text-xs font-bold px-2 py-1 rounded border-none outline-none cursor-pointer ${
+                                    order.status === 'Ordered' ? 'bg-yellow-100 text-yellow-800' :
+                                    order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
+                                    order.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                                    'bg-blue-100 text-blue-800'
+                                }`}
+                            >
+                                {['Ordered', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'].map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="flex flex-col md:flex-row gap-4 mb-4">
+                            <div className="flex-1 space-y-2">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase">Items</h4>
+                                {order.items.map(item => (
+                                    <div key={item.id} className="flex gap-3 items-center">
+                                        <img src={item.images[0]} className="w-10 h-10 rounded bg-gray-100 object-cover" />
+                                        <div>
+                                            <p className="text-sm font-medium dark:text-white line-clamp-1">{item.name}</p>
+                                            <p className="text-xs text-gray-500">Qty: {item.quantity} x ₹{item.price}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase">Shipping & Payment</h4>
+                                <p className="text-sm dark:text-gray-300">
+                                    {order.shippingAddress.fullName}<br/>
+                                    {order.shippingAddress.line1}, {order.shippingAddress.city}<br/>
+                                    Phone: {order.shippingAddress.phone}
+                                </p>
+                                <p className="text-sm font-bold mt-2">
+                                    Total: ₹{order.totalAmount} <span className="text-xs font-normal text-gray-500">({order.paymentMethod})</span>
+                                </p>
+                                {order.paymentDetails?.verifiedAmount && (
+                                    <p className="text-xs text-green-600 font-bold">Verified Amount: ₹{order.paymentDetails.verifiedAmount}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {order.cancelRequest && order.cancelRequest.status === 'pending' && (
+                            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p className="text-xs font-bold text-red-700 dark:text-red-300">Cancellation Reason:</p>
+                                    <p className="text-sm text-red-600 dark:text-red-200">{order.cancelRequest.reason}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => handleStatusUpdate(order.id, 'Cancelled')} className="bg-red-600 hover:bg-red-700 text-white">Approve</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleRejectCancel(order.id)} className="border-red-200 text-red-600 hover:bg-red-50">Reject</Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+export const AdminPaymentSettingsPage = () => {
+    const { showToast, state } = useAppContext();
+    const [settings, setSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        api.getPaymentSettings().then(data => {
+            setSettings(data);
+            setLoading(false);
+        });
+    }, []);
+
+    const handleSave = async () => {
+        if (state.user?.id === 'demo_admin_user') {
+            showToast("Demo Mode: Cannot save settings", "error");
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await api.savePaymentSettings(settings);
+            showToast("Payment Settings Saved", "success");
+        } catch (e) {
+            showToast("Failed to save settings", "error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleToggleApp = (appKey: keyof typeof settings.supportedApps) => {
+        setSettings({
+            ...settings,
+            supportedApps: {
+                ...settings.supportedApps,
+                [appKey]: !settings.supportedApps[appKey]
+            }
+        });
+    };
+
+    if (loading) return <div className="p-10 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+
+    return (
+        <div className="p-6 pb-20 animate-fade-in max-w-2xl">
+            <div className="flex items-center gap-2 mb-6">
+                <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
+                <h1 className="text-2xl font-bold dark:text-white">Payment Settings</h1>
+            </div>
+
+            <div className="space-y-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border dark:border-gray-700">
+                <div className="space-y-4">
+                    <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
+                        <DollarSign size={20} className="text-primary"/> UPI Details
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">UPI ID (VPA)</label>
+                            <Input 
+                                placeholder="e.g. merchant@upi" 
+                                value={settings.upiId} 
+                                onChange={e => setSettings({...settings, upiId: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">Merchant Name</label>
+                            <Input 
+                                placeholder="e.g. Online Mart" 
+                                value={settings.merchantName} 
+                                onChange={e => setSettings({...settings, merchantName: e.target.value})}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">QR Code Image URL</label>
+                        <Input 
+                            placeholder="https://..." 
+                            value={settings.qrImageUrl} 
+                            onChange={e => setSettings({...settings, qrImageUrl: e.target.value})}
+                        />
+                        {settings.qrImageUrl && (
+                            <img src={settings.qrImageUrl} alt="QR Preview" className="mt-2 w-32 h-32 object-contain border rounded-lg bg-gray-50" />
+                        )}
+                    </div>
+                </div>
+
+                <div className="h-px bg-gray-100 dark:bg-gray-700"></div>
+
+                <div className="space-y-4">
+                    <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
+                        <Sliders size={20} className="text-primary"/> Configuration
+                    </h3>
+                    
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <span className="text-sm font-medium dark:text-white">Enable QR Code Payment</span>
+                        <input 
+                            type="checkbox" 
+                            checked={settings.enableQr} 
+                            onChange={e => setSettings({...settings, enableQr: e.target.checked})}
+                            className="w-5 h-5 accent-primary"
+                        />
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <span className="text-sm font-medium dark:text-white">Enable Deep Links (Direct App Open)</span>
+                        <input 
+                            type="checkbox" 
+                            checked={settings.enableDeepLink} 
+                            onChange={e => setSettings({...settings, enableDeepLink: e.target.checked})}
+                            className="w-5 h-5 accent-primary"
+                        />
+                    </div>
+                </div>
+
+                <div className="h-px bg-gray-100 dark:bg-gray-700"></div>
+
+                <div className="space-y-4">
+                    <h3 className="font-bold text-lg dark:text-white">Supported Payment Apps</h3>
+                    <p className="text-xs text-gray-500">Toggle which apps appear in the payment options.</p>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        {Object.keys(settings.supportedApps).map((key) => {
+                            const appKey = key as keyof typeof settings.supportedApps;
+                            return (
+                                <div key={key} className="flex items-center gap-2 p-2 border dark:border-gray-700 rounded-lg">
+                                    <input 
+                                        type="checkbox" 
+                                        id={key}
+                                        checked={settings.supportedApps[appKey]}
+                                        onChange={() => handleToggleApp(appKey)}
+                                        className="w-4 h-4 accent-primary"
+                                    />
+                                    <label htmlFor={key} className="text-sm capitalize cursor-pointer flex-1 dark:text-gray-300">
+                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                    </label>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="pt-4">
+                    <Button onClick={handleSave} isLoading={saving} className="w-full">Save Settings</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const AdminReviewsPage = () => {
+    const { showToast } = useAppContext();
+    const [reviews, setReviews] = useState<Review[]>([]);
+    
+    useEffect(() => {
+        loadReviews();
+    }, []);
+
+    const loadReviews = async () => {
+        const data = await api.getReviews();
+        setReviews(data);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (confirm("Delete this review?")) {
+            try {
+                await api.deleteReview(id);
+                showToast("Review deleted", "info");
+                loadReviews();
+            } catch (e) {
+                showToast("Failed to delete review", "error");
+            }
+        }
+    };
+
+    return (
+        <div className="p-6 pb-20 animate-fade-in">
+             <div className="flex items-center gap-2 mb-6">
+                <Link to="/admin" className="md:hidden p-2 -ml-2 text-gray-500"><ChevronLeft/></Link>
+                <h1 className="text-2xl font-bold dark:text-white">Content Moderation</h1>
+            </div>
+
+            <div className="space-y-4">
+                <h2 className="font-bold text-lg dark:text-white">Customer Reviews</h2>
+                {reviews.length === 0 && <p className="text-gray-500">No reviews found.</p>}
+                
+                <div className="grid gap-4">
+                    {reviews.map(review => (
+                        <div key={review.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 flex gap-4">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex text-yellow-400">
+                                        {Array(5).fill(0).map((_, i) => (
+                                            <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i >= review.rating ? "text-gray-300" : ""} />
+                                        ))}
+                                    </div>
+                                    <span className="text-xs font-bold dark:text-white">{review.userName}</span>
+                                    <span className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{review.comment}</p>
+                                <p className="text-xs text-gray-400">Product ID: {review.productId}</p>
+                            </div>
+                            <button onClick={() => handleDelete(review.id)} className="text-red-400 hover:text-red-600 p-2 h-fit">
+                                <Trash2 size={18} />
+                            </button>
                         </div>
                     ))}
                 </div>
-            )}
-            
-            {activeTab === 'banners' && (
-                <div className="space-y-4 animate-fade-in">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="font-bold dark:text-white">Active Banners</h2>
-                        <Button size="sm" onClick={() => setIsAddingBanner(true)}><Plus size={16}/> Add Banner</Button>
-                    </div>
-
-                    {isAddingBanner && (
-                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border dark:border-gray-700 mb-4">
-                            <h3 className="font-bold mb-3 dark:text-white">New Banner Details</h3>
-                            <form onSubmit={handleSaveBanner} className="space-y-3">
-                                <Input placeholder="Title (e.g., Flash Sale)" value={newBanner.title} onChange={e => setNewBanner({...newBanner, title: e.target.value})} required/>
-                                <Input placeholder="Subtitle (e.g., 50% Off)" value={newBanner.subtitle} onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})} required/>
-                                <Input placeholder="Image URL (Landscape)" value={newBanner.imageUrl} onChange={e => setNewBanner({...newBanner, imageUrl: e.target.value})} required/>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Input placeholder="Link Category (e.g., Electronics)" value={newBanner.link} onChange={e => setNewBanner({...newBanner, link: e.target.value})} required/>
-                                    <div className="flex items-center gap-2">
-                                        <input type="checkbox" className="w-5 h-5 accent-primary" checked={newBanner.isVisible} onChange={e => setNewBanner({...newBanner, isVisible: e.target.checked})}/>
-                                        <span className="text-sm dark:text-white">Visible?</span>
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="ghost" onClick={() => setIsAddingBanner(false)}>Cancel</Button>
-                                    <Button type="submit">Save</Button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-
-                    <div className="grid gap-4">
-                        {state.banners.map(banner => (
-                            <div key={banner.id} className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border dark:border-gray-700 relative group">
-                                <img src={banner.imageUrl} className={`w-full h-32 object-cover ${!banner.isVisible ? 'opacity-50 grayscale' : ''}`} alt={banner.title} />
-                                <div className="absolute inset-0 bg-black/40 flex items-center px-6">
-                                    <div className="text-white">
-                                        <h3 className="font-bold text-lg">{banner.title} {banner.isVisible ? '' : '(Hidden)'}</h3>
-                                        <p className="text-sm opacity-90">{banner.subtitle}</p>
-                                    </div>
-                                </div>
-                                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => toggleBannerVisibility(banner)} className="bg-white p-2 rounded-full shadow text-gray-700">
-                                        {banner.isVisible ? <Eye size={16}/> : <EyeOff size={16}/>}
-                                    </button>
-                                    <button onClick={() => { setIsAddingBanner(true); setNewBanner(banner); }} className="bg-white p-2 rounded-full shadow text-blue-500"><Edit2 size={16}/></button>
-                                    <button onClick={() => handleDeleteBanner(banner.id)} className="bg-white p-2 rounded-full shadow text-red-500"><Trash2 size={16}/></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'delivery' && (
-                <div className="animate-fade-in space-y-6">
-                    <h2 className="font-bold dark:text-white mb-2">Delivery Settings</h2>
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl space-y-6 shadow-sm border dark:border-gray-700">
-                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-                            <h3 className="font-bold mb-2 flex items-center gap-2"><Info size={16}/> Calculation Formula</h3>
-                            <p className="font-mono bg-blue-100 dark:bg-blue-900/40 p-2 rounded">Total = Base Charge + (Distance × Per KM Charge)</p>
-                            <p className="mt-2 text-xs opacity-80">* Distance is calculated from the <b>Store Location</b> below to the customer's delivery address using OpenRouteService.</p>
-                        </div>
-                        
-                        {/* Store Location Map */}
-                        <div className="space-y-2">
-                             <label className="text-sm font-bold flex items-center gap-2 dark:text-gray-200"><MapPin size={16}/> Set Store Location</label>
-                             <MapPicker 
-                                initialLocation={dSettings.storeLocation || DEFAULT_STORE_LOCATION} 
-                                onLocationSelect={handleStoreLocationSelect}
-                                height="250px"
-                             />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Base Delivery Charge (₹)</label>
-                                <p className="text-xs text-gray-500 mb-2">Fixed fee applied to every order.</p>
-                                <Input type="number" value={dSettings.baseCharge} onChange={e => setDSettings({...dSettings, baseCharge: Number(e.target.value)})} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Per KM Charge (₹)</label>
-                                <p className="text-xs text-gray-500 mb-2">Additional fee per kilometer.</p>
-                                <Input type="number" value={dSettings.perKmCharge} onChange={e => setDSettings({...dSettings, perKmCharge: Number(e.target.value)})} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Free Delivery Above (₹)</label>
-                                <p className="text-xs text-gray-500 mb-2">Cart value threshold for free shipping.</p>
-                                <Input type="number" value={dSettings.freeDeliveryAbove} onChange={e => setDSettings({...dSettings, freeDeliveryAbove: Number(e.target.value)})} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Estimated Days</label>
-                                <p className="text-xs text-gray-500 mb-2">Delivery time shown to users.</p>
-                                <Input value={dSettings.estimatedDays} onChange={e => setDSettings({...dSettings, estimatedDays: e.target.value})} />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 p-4 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                            <input 
-                                type="checkbox" 
-                                id="cod" 
-                                className="w-5 h-5 accent-primary cursor-pointer" 
-                                checked={dSettings.codEnabled} 
-                                onChange={e => setDSettings({...dSettings, codEnabled: e.target.checked})} 
-                            />
-                            <label htmlFor="cod" className="font-medium cursor-pointer flex-1">Enable Cash on Delivery (COD)</label>
-                        </div>
-
-                        <Button onClick={saveDeliverySettings} className="w-full mt-4 text-lg"><Save className="w-5 h-5"/> Save Settings</Button>
-                    </div>
-                </div>
-            )}
+            </div>
         </div>
     );
 };

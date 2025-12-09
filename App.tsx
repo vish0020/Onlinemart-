@@ -1,23 +1,24 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, LogIn, ChevronRight, LogOut, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { ShoppingCart, User as UserIcon, LayoutDashboard, Search, Box, ClipboardList, Layers, X, Clock, ArrowRight, Loader, Smartphone, LogIn, ChevronRight, LogOut, Mail, Lock, User, Eye, EyeOff, Mic, QrCode } from 'lucide-react';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from './firebase';
 import { api } from './services/mockService';
-import { Logo, Button, Input } from './components/Shared';
+import { Logo, Button, Input, ToastContainer, PWAInstallBanner } from './components/Shared';
 import { HomePage, ProductDetailsPage, CartPage, CheckoutPage, ProfilePage } from './pages/UserPages';
-import { AdminDashboard, AdminProducts, AdminOrdersPage, AdminReviewsPage } from './pages/AdminPages';
+import { AdminDashboard, AdminProducts, AdminOrdersPage, AdminReviewsPage, AdminPaymentSettingsPage } from './pages/AdminPages';
 import { TermsPage, PrivacyPage } from './pages/InfoPages';
 import { AppProvider, useAppContext } from './Context';
 
 // --- Search Overlay Component ---
 const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, showToast } = useAppContext();
     const navigate = useNavigate();
     const [query, setQuery] = useState(state.searchQuery || '');
     const inputRef = useRef<HTMLInputElement>(null);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [isListening, setIsListening] = useState(false);
 
     useEffect(() => {
         if(inputRef.current) inputRef.current.focus();
@@ -33,6 +34,25 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
         dispatch({ type: 'SET_SEARCH', payload: searchTerm });
         onClose();
         navigate('/');
+    };
+
+    const handleVoiceSearch = () => {
+        if (!('webkitSpeechRecognition' in window)) {
+            showToast("Voice search not supported in this browser", "error");
+            return;
+        }
+        
+        const recognition = new (window as any).webkitSpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onerror = () => setIsListening(false);
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setQuery(transcript);
+            handleSearch(transcript);
+        };
+        recognition.start();
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -61,6 +81,12 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
                         className="w-full text-lg bg-transparent outline-none dark:text-white placeholder-gray-400"
                     />
                 </div>
+                <button 
+                    onClick={handleVoiceSearch} 
+                    className={`p-2 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:text-primary'}`}
+                >
+                    <Mic size={20} />
+                </button>
                 {query && (
                     <button onClick={() => setQuery('')} className="p-2 text-gray-400 hover:text-gray-600"><X size={20} className="fill-current" /></button>
                 )}
@@ -70,7 +96,7 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
                 {query === '' ? (
                     <div>
                         {recentSearches.length > 0 && (
-                            <div className="mb-6">
+                            <div className="mb-6 animate-slide-up">
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Recent Searches</h3>
                                 <div className="space-y-3">
                                     {recentSearches.map(term => (
@@ -84,7 +110,7 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
                         )}
                     </div>
                 ) : (
-                    <div>
+                    <div className="animate-fade-in">
                          {suggestions.length > 0 ? (
                              <div className="space-y-2">
                                  {suggestions.map(p => (
@@ -101,7 +127,7 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
                          ) : (
                              <p className="text-center text-gray-500 mt-10">No matches found.</p>
                          )}
-                         <button onClick={() => handleSearch(query)} className="w-full mt-4 p-3 bg-primary/10 text-primary-dark font-bold rounded-lg">
+                         <button onClick={() => handleSearch(query)} className="w-full mt-4 p-3 bg-primary/10 text-primary-dark font-bold rounded-lg hover:bg-primary/20 transition-colors">
                              See all results for "{query}"
                          </button>
                     </div>
@@ -113,7 +139,7 @@ const SearchOverlay = ({ onClose }: { onClose: () => void }) => {
 
 // --- Login Modal Component ---
 const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-    const { dispatch } = useAppContext();
+    const { dispatch, showToast } = useAppContext();
     const navigate = useNavigate();
     const [mode, setMode] = useState<'login' | 'signup'>('login');
     const [formData, setFormData] = useState({ name: '', email: '', password: '' });
@@ -137,6 +163,7 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
             setLoading(true);
             const user = await api.signInWithGoogle();
             dispatch({ type: 'SET_USER', payload: user });
+            showToast(`Welcome ${user.name}!`, "success");
             onClose();
         } catch (error: any) {
             setError(error.message || "Google Sign-in failed");
@@ -154,9 +181,11 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
                 if(!formData.name) throw new Error("Name is required");
                 const user = await api.signUpWithEmail(formData.name, formData.email, formData.password);
                 dispatch({ type: 'SET_USER', payload: user });
+                showToast("Account Created Successfully!", "success");
             } else {
                 const user = await api.loginWithEmail(formData.email, formData.password);
                 dispatch({ type: 'SET_USER', payload: user });
+                showToast("Welcome Back!", "success");
             }
             onClose();
         } catch (error: any) {
@@ -173,8 +202,8 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
 
     return (
         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative border dark:border-gray-700 max-h-[90vh] overflow-y-auto">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative border dark:border-gray-700 max-h-[90vh] overflow-y-auto animate-scale-up">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors hover:rotate-90 duration-300">
                     <X size={20} />
                 </button>
 
@@ -186,27 +215,27 @@ const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
                 <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg mb-6">
                     <button 
                         onClick={() => { setMode('login'); setError(''); }}
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === 'login' ? 'bg-white dark:bg-gray-600 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all duration-300 ${mode === 'login' ? 'bg-white dark:bg-gray-600 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
                         Login
                     </button>
                     <button 
                         onClick={() => { setMode('signup'); setError(''); }}
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === 'signup' ? 'bg-white dark:bg-gray-600 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all duration-300 ${mode === 'signup' ? 'bg-white dark:bg-gray-600 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
                         Sign Up
                     </button>
                 </div>
 
                 {error && (
-                    <div className="mb-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 p-3 rounded-lg text-xs font-bold text-center">
+                    <div className="mb-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 p-3 rounded-lg text-xs font-bold text-center animate-slide-up">
                         {error}
                     </div>
                 )}
 
                 <form onSubmit={handleEmailAuth} className="space-y-4 mb-4">
                     {mode === 'signup' && (
-                        <div className="relative group">
+                        <div className="relative group animate-fade-in">
                             <User size={18} className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
                             <Input 
                                 placeholder="Full Name" 
@@ -310,6 +339,8 @@ const AppContent = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
+            <ToastContainer />
+            <PWAInstallBanner />
             {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
             <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
 
@@ -330,10 +361,10 @@ const AppContent = () => {
                             <Search size={22} />
                         </button>
 
-                        <Link to="/cart" className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                            <ShoppingCart size={22} />
+                        <Link to="/cart" className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors group">
+                            <ShoppingCart size={22} className="group-hover:scale-110 transition-transform" />
                             {cartCount > 0 && (
-                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm animate-fade-in">
+                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm animate-scale-up">
                                     {cartCount}
                                 </span>
                             )}
@@ -355,7 +386,7 @@ const AppContent = () => {
                 </div>
                 
                 {state.addresses.length > 0 && (
-                    <div className="bg-primary/10 dark:bg-gray-800 py-1.5 px-4 text-xs flex justify-center md:justify-start gap-2 items-center text-gray-600 dark:text-gray-300 border-b dark:border-gray-800">
+                    <div className="bg-primary/10 dark:bg-gray-800 py-1.5 px-4 text-xs flex justify-center md:justify-start gap-2 items-center text-gray-600 dark:text-gray-300 border-b dark:border-gray-800 animate-slide-up">
                         <Smartphone size={12} className="text-primary-dark"/>
                         <span>Delivering to: <b>{state.addresses.find(a => a.isDefault)?.pincode || state.addresses[0].pincode}</b></span>
                     </div>
@@ -365,13 +396,14 @@ const AppContent = () => {
             <main className="max-w-7xl mx-auto min-h-[calc(100vh-64px)]">
                 <div className="flex">
                     {isAdmin && isAdminRoute && (
-                        <aside className="hidden md:block w-64 h-[calc(100vh-64px)] sticky top-16 bg-white dark:bg-gray-800 border-r dark:border-gray-700 overflow-y-auto">
+                        <aside className="hidden md:block w-64 h-[calc(100vh-64px)] sticky top-16 bg-white dark:bg-gray-800 border-r dark:border-gray-700 overflow-y-auto animate-slide-in-right">
                             <div className="p-4 space-y-2">
                                 <p className="text-xs font-bold text-gray-500 uppercase px-3 mb-2">Admin Panel</p>
-                                <Link to="/admin" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><LayoutDashboard size={20}/> Dashboard</Link>
-                                <Link to="/admin/products" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><Box size={20}/> Products</Link>
-                                <Link to="/admin/orders" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><ClipboardList size={20}/> Orders</Link>
-                                <Link to="/admin/content" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><Layers size={20}/> Content</Link>
+                                <Link to="/admin" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><LayoutDashboard size={20}/> Dashboard</Link>
+                                <Link to="/admin/products" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><Box size={20}/> Products</Link>
+                                <Link to="/admin/orders" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><ClipboardList size={20}/> Orders</Link>
+                                <Link to="/admin/content" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><Layers size={20}/> Content</Link>
+                                <Link to="/admin/settings" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><QrCode size={20}/> Payment Settings</Link>
                             </div>
                         </aside>
                     )}
@@ -390,6 +422,7 @@ const AppContent = () => {
                                     <Route path="/admin/products" element={<AdminProducts />} />
                                     <Route path="/admin/orders" element={<AdminOrdersPage />} />
                                     <Route path="/admin/content" element={<AdminReviewsPage />} />
+                                    <Route path="/admin/settings" element={<AdminPaymentSettingsPage />} />
                                 </>
                             )}
 

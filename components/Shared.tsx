@@ -1,20 +1,20 @@
-
-import React, { useState } from 'react';
-import { ShoppingCart, Star, Heart, Plus, Minus, Loader, CheckCircle, MapPin, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingCart, Star, Heart, Plus, Minus, Loader, CheckCircle, MapPin, X, Info, AlertCircle, Download } from 'lucide-react';
 import { Product, Address, Location } from '../types';
 import { MOCK_LOCATIONS } from '../services/mockService';
 import { MapPicker } from './MapPicker';
 import { reverseGeocode } from '../services/mapService';
+import { useAppContext } from '../Context';
 
 export const Logo: React.FC<{ size?: "sm" | "md" | "lg" }> = ({ size = "md" }) => {
   const sizes = { sm: "h-8 w-8", md: "h-12 w-12", lg: "h-20 w-20" };
   const textSizes = { sm: "text-lg", md: "text-2xl", lg: "text-4xl" };
   
   return (
-    <div className="flex items-center gap-2">
-      <div className={`${sizes[size]} bg-primary rounded-full flex items-center justify-center shadow-lg relative overflow-hidden`}>
-         <div className="absolute inset-0 bg-yellow-300 opacity-20 transform rotate-45"></div>
-         <ShoppingCart className="text-black w-1/2 h-1/2" strokeWidth={2.5} />
+    <div className="flex items-center gap-2 select-none">
+      <div className={`${sizes[size]} bg-primary rounded-full flex items-center justify-center shadow-lg relative overflow-hidden group`}>
+         <div className="absolute inset-0 bg-yellow-300 opacity-20 transform rotate-45 group-hover:rotate-90 transition-transform duration-700"></div>
+         <ShoppingCart className="text-black w-1/2 h-1/2 group-hover:scale-110 transition-transform duration-300" strokeWidth={2.5} />
       </div>
       <span className={`font-bold tracking-tight text-secondary dark:text-white ${textSizes[size]}`}>
         online<span className="text-primary">Mart</span>
@@ -42,14 +42,15 @@ export const Button: React.FC<ButtonProps> = ({
   const base = `rounded-lg font-semibold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClasses[size]}`;
   
   const variants = {
-    primary: "bg-primary text-black shadow-md hover:bg-primary-dark",
-    secondary: "bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black",
+    primary: "bg-primary text-black shadow-md hover:bg-primary-dark hover:shadow-lg",
+    secondary: "bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black hover:shadow-lg",
     outline: "border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
     ghost: "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300"
   };
 
   return (
     <button className={`${base} ${variants[variant]} ${className}`} disabled={isLoading} {...props}>
+      {isLoading && <Loader className="animate-spin w-4 h-4"/>}
       {children}
     </button>
   );
@@ -62,6 +63,75 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ c
   />
 );
 
+// --- Toast Notification Component ---
+export const ToastContainer = () => {
+    const { toasts, removeToast } = useAppContext();
+    
+    return (
+        <div className="fixed bottom-20 md:bottom-10 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
+            {toasts.map(toast => (
+                <div 
+                    key={toast.id} 
+                    className={`
+                        pointer-events-auto flex items-center gap-3 p-4 rounded-xl shadow-xl border animate-slide-up
+                        ${toast.type === 'success' ? 'bg-green-500 border-green-600 text-white' : ''}
+                        ${toast.type === 'error' ? 'bg-red-500 border-red-600 text-white' : ''}
+                        ${toast.type === 'info' ? 'bg-gray-900 border-gray-800 text-white' : ''}
+                    `}
+                >
+                    {toast.type === 'success' && <CheckCircle className="shrink-0" size={20} />}
+                    {toast.type === 'error' && <AlertCircle className="shrink-0" size={20} />}
+                    {toast.type === 'info' && <Info className="shrink-0" size={20} />}
+                    
+                    <p className="text-sm font-medium flex-1">{toast.message}</p>
+                    <button onClick={() => removeToast(toast.id)} className="opacity-80 hover:opacity-100">
+                        <X size={16} />
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// --- PWA Install Banner ---
+export const PWAInstallBanner = () => {
+    const { deferredPrompt, setDeferredPrompt, showToast } = useAppContext();
+
+    if (!deferredPrompt) return null;
+
+    const handleInstall = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                showToast("Installing OnlineMart...", "success");
+            }
+            setDeferredPrompt(null);
+        }
+    };
+
+    return (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-4 shadow-2xl animate-slide-up">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="bg-primary/20 p-2 rounded-lg text-primary-dark">
+                        <Download size={24} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold dark:text-white">Install App</h4>
+                        <p className="text-xs text-gray-500">Add to home screen for better experience</p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setDeferredPrompt(null)}>Not Now</Button>
+                    <Button size="sm" onClick={handleInstall}>Install</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 interface ProductCardProps {
   product: Product; 
   onAdd: (e: React.MouseEvent) => void;
@@ -71,10 +141,10 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, onToggleWishlist, isWishlisted, onClick }) => (
-  <div onClick={onClick} className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer relative border border-gray-100 dark:border-gray-700">
+  <div onClick={onClick} className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative border border-gray-100 dark:border-gray-700 animate-fade-in">
     <button 
       onClick={(e) => { e.stopPropagation(); onToggleWishlist(e); }}
-      className="absolute top-2 right-2 z-10 p-2 bg-white/80 dark:bg-black/50 backdrop-blur-sm rounded-full shadow-sm"
+      className="absolute top-2 right-2 z-10 p-2 bg-white/80 dark:bg-black/50 backdrop-blur-sm rounded-full shadow-sm hover:scale-110 transition-transform active:scale-95"
     >
       <Heart className={`w-5 h-5 transition-colors ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600 dark:text-gray-300'}`} />
     </button>
@@ -83,43 +153,44 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, onTogg
       <img 
         src={product.images && product.images.length > 0 ? product.images[0] : 'https://via.placeholder.com/300?text=No+Image'} 
         alt={product.name}
-        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         loading="lazy"
       />
       {product.stock < 5 && product.stock > 0 && (
-        <span className="absolute bottom-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+        <span className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg animate-pulse">
           Only {product.stock} left!
         </span>
       )}
       {product.stock === 0 && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <span className="text-white font-bold uppercase tracking-wider">Out of Stock</span>
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+          <span className="text-white font-bold uppercase tracking-wider text-sm border-2 border-white px-3 py-1">Out of Stock</span>
         </div>
       )}
     </div>
 
     <div className="p-4">
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{product.category}</p>
-      <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight h-10 mb-2">
+      <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight h-10 mb-2 group-hover:text-primary transition-colors">
         {product.name}
       </h3>
       
       <div className="flex items-center gap-1 mb-3">
-        <Star className="w-4 h-4 fill-primary text-primary" />
-        <span className="text-sm font-medium dark:text-gray-200">{product.rating}</span>
-        <span className="text-xs text-gray-400">({product.reviewCount})</span>
+        <Star className="w-3.5 h-3.5 fill-primary text-primary" />
+        <span className="text-xs font-bold dark:text-gray-200">{product.rating}</span>
+        <span className="text-[10px] text-gray-400">({product.reviewCount})</span>
       </div>
 
       <div className="flex items-center justify-between mt-2">
         <div>
           <span className="text-lg font-bold text-gray-900 dark:text-white">₹{product.price}</span>
           {product.originalPrice && (
-            <span className="text-sm text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
+            <span className="text-xs text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
           )}
         </div>
         <button 
           onClick={(e) => { e.stopPropagation(); onAdd(e); }}
-          className="bg-primary text-black p-2 rounded-lg hover:bg-primary-dark transition-colors shadow-md active:scale-90"
+          className="bg-primary text-black p-2 rounded-lg hover:bg-primary-dark transition-all shadow-md active:scale-90 hover:shadow-lg disabled:opacity-50 disabled:active:scale-100"
+          disabled={product.stock === 0}
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -144,7 +215,7 @@ export const ProductSkeleton: React.FC = () => (
   </div>
 );
 
-// --- New Address Form Component ---
+// --- Address Form Component ---
 interface AddressFormProps {
   initialData?: Address | null;
   onSave: (address: Address) => void;
@@ -184,7 +255,6 @@ export const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSave, o
       setFormData(prev => ({ ...prev, location: tempLocation }));
       setShowMapModal(false);
 
-      // Auto-fill address details using Reverse Geocoding
       setLoadingLoc(true);
       const addressData = await reverseGeocode(tempLocation.lat, tempLocation.lng);
       setLoadingLoc(false);
@@ -204,18 +274,18 @@ export const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSave, o
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in pb-10">
+      <form onSubmit={handleSubmit} className="space-y-4 animate-slide-up pb-10">
         <h3 className="text-lg font-bold dark:text-white flex justify-between items-center">
           {initialData ? 'Edit Address' : 'Add New Address'}
           {loadingLoc && <span className="text-xs text-primary flex items-center gap-1"><Loader className="animate-spin w-3 h-3"/> Fetching details...</span>}
         </h3>
 
-        <Button type="button" variant="outline" onClick={() => setShowMapModal(true)} className="w-full flex items-center gap-2 py-4 border-dashed dark:border-gray-600">
-           <MapPin className="text-red-500" />
+        <Button type="button" variant="outline" onClick={() => setShowMapModal(true)} className="w-full flex items-center gap-2 py-4 border-dashed dark:border-gray-600 group">
+           <MapPin className="text-red-500 group-hover:scale-110 transition-transform" />
            {formData.location ? "Change Location on Map" : "Choose on Map"}
         </Button>
         {formData.location && (
-            <p className="text-xs text-green-600 flex items-center justify-center gap-1">
+            <p className="text-xs text-green-600 flex items-center justify-center gap-1 animate-fade-in">
                 <CheckCircle size={12}/> Location pinned successfully
             </p>
         )}
@@ -278,9 +348,9 @@ export const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSave, o
              id="defaultAddr" 
              checked={formData.isDefault} 
              onChange={e => setFormData({...formData, isDefault: e.target.checked})} 
-             className="w-5 h-5 accent-primary"
+             className="w-5 h-5 accent-primary cursor-pointer"
            />
-           <label htmlFor="defaultAddr" className="dark:text-white text-sm">Make this my default address</label>
+           <label htmlFor="defaultAddr" className="dark:text-white text-sm cursor-pointer">Make this my default address</label>
         </div>
 
         <div className="flex gap-3 pt-2">
@@ -291,9 +361,9 @@ export const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSave, o
 
       {/* Map Modal */}
       {showMapModal && (
-          <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center">
+          <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in">
               <div className="bg-white dark:bg-gray-800 w-full h-[80vh] sm:h-[600px] sm:max-w-2xl sm:rounded-2xl rounded-t-2xl flex flex-col relative animate-slide-up">
-                   <button onClick={() => setShowMapModal(false)} className="absolute top-4 right-4 z-10 bg-white dark:bg-gray-900 p-2 rounded-full shadow-md text-gray-500">
+                   <button onClick={() => setShowMapModal(false)} className="absolute top-4 right-4 z-10 bg-white dark:bg-gray-900 p-2 rounded-full shadow-md text-gray-500 hover:scale-110 transition-transform">
                        <X size={20}/>
                    </button>
                    

@@ -16,3 +16,19 @@ export const DEFAULT_SETTINGS = {
     serviceablePincodes: [],
     storeLocation: DEFAULT_STORE_LOCATION
 };
+
+export const DEFAULT_PAYMENT_SETTINGS = {
+    upiId: "example@upi",
+    merchantName: "OnlineMart",
+    qrImageUrl: "",
+    enableQr: true,
+    enableDeepLink: true,
+    supportedApps: {
+        googlePay: true,
+        phonePe: true,
+        paytm: true,
+        bhim: true,
+        cred: false,
+        amazonPay: false
+    }
+};

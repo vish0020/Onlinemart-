@@ -1,5 +1,4 @@
-
-import React, { createContext, useContext, useReducer, useState, ReactNode, PropsWithChildren } from 'react';
+import React, { createContext, useContext, useReducer, useState, ReactNode, PropsWithChildren, useEffect } from 'react';
 import { AppState, Product, User, DeliverySettings, HeroBanner, Address, CartItem } from './types';
 import { DEFAULT_STORE_LOCATION } from './constants';
 
@@ -91,6 +90,12 @@ export const reducer = (state: AppState, action: Action): AppState => {
   }
 };
 
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 const AppContext = createContext<{ 
   state: AppState; 
   dispatch: React.Dispatch<Action>;
@@ -98,6 +103,11 @@ const AppContext = createContext<{
   setShowLoginModal: (show: boolean) => void;
   pendingRedirect: string | null;
   setPendingRedirect: (path: string | null) => void;
+  toasts: Toast[];
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  removeToast: (id: string) => void;
+  deferredPrompt: any;
+  setDeferredPrompt: (prompt: any) => void;
 } | null>(null);
 
 export const useAppContext = () => {
@@ -110,6 +120,28 @@ export const AppProvider = ({ children }: PropsWithChildren) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+      const id = Date.now().toString();
+      setToasts(prev => [...prev, { id, message, type }]);
+      setTimeout(() => removeToast(id), 3000); // Auto dismiss
+  };
+
+  const removeToast = (id: string) => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  useEffect(() => {
+      // Listen for PWA install prompt
+      const handler = (e: any) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+      };
+      window.addEventListener('beforeinstallprompt', handler);
+      return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
   return (
     <AppContext.Provider value={{ 
@@ -118,7 +150,12 @@ export const AppProvider = ({ children }: PropsWithChildren) => {
       showLoginModal,
       setShowLoginModal,
       pendingRedirect,
-      setPendingRedirect
+      setPendingRedirect,
+      toasts,
+      showToast,
+      removeToast,
+      deferredPrompt,
+      setDeferredPrompt
     }}>
       {children}
     </AppContext.Provider>

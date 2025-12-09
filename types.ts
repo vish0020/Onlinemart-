@@ -16,6 +16,8 @@ export interface Product {
   price: number;
   originalPrice?: number;
   description: string;
+  features?: string; // General text features
+  attributes?: Record<string, string>; // Dynamic specific fields (e.g. RAM: 4GB, Color: Red)
   category: string;
   subcategory?: string;
   images: string[]; // URLs
@@ -64,6 +66,11 @@ export interface Order {
   createdAt: string; // ISO String
   shippingAddress: Address;
   paymentMethod: 'COD' | 'Online';
+  paymentDetails?: {
+      upiId?: string;
+      transactionId?: string; // Optional user entered UTR
+      verifiedAmount?: number; // The unique amount (e.g., 200.15)
+  };
   cancelRequest?: {
     reason: string;
     status: 'pending' | 'rejected' | 'approved';
@@ -79,6 +86,22 @@ export interface DeliverySettings {
   estimatedDays: string;
   serviceablePincodes: string[];
   storeLocation: Location; // Admin store location
+}
+
+export interface PaymentSettings {
+    upiId: string;
+    merchantName: string;
+    qrImageUrl: string;
+    enableQr: boolean;
+    enableDeepLink: boolean;
+    supportedApps: {
+        googlePay: boolean;
+        phonePe: boolean;
+        paytm: boolean;
+        bhim: boolean;
+        cred: boolean;
+        amazonPay: boolean;
+    };
 }
 
 export interface HeroBanner {

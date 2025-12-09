@@ -1,3 +1,4 @@
+
 import { 
     ref, 
     get, 
@@ -10,7 +11,8 @@ import {
     push, 
     child, 
     runTransaction,
-    serverTimestamp
+    serverTimestamp,
+    limitToLast
 } from "firebase/database";
 import { 
     signInWithPopup, 
@@ -20,9 +22,9 @@ import {
     updateProfile 
 } from "firebase/auth";
 import { db, auth, googleProvider } from "../firebase";
-import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address } from '../types';
+import { Product, User, Order, DeliverySettings, OrderStatus, HeroBanner, Review, Address, PaymentSettings } from '../types';
 import { calculateDrivingDistance } from './mapService';
-import { DEFAULT_SETTINGS } from '../constants';
+import { DEFAULT_SETTINGS, DEFAULT_PAYMENT_SETTINGS } from '../constants';
 
 // --- Configuration ---
 export const MOCK_LOCATIONS = {
@@ -53,24 +55,101 @@ export const MOCK_LOCATIONS = {
   ]
 };
 
-export const PRODUCT_CATEGORIES: Record<string, string[]> = {
-  "Mobiles & Accessories": ["Smartphones", "Cases & Covers", "Power Banks", "Chargers", "Screen Protectors"],
-  "Computers & Laptops": ["Laptops", "Desktops", "Monitors", "Printers", "Storage", "Computer Accessories"],
-  "TV & Home Entertainment": ["Televisions", "Home Audio", "Projectors", "Streaming Devices"],
-  "Men's Fashion": ["T-Shirts", "Shirts", "Jeans", "Trousers", "Shoes", "Watches", "Accessories", "Innerwear"],
-  "Women's Fashion": ["Dresses", "Tops & Tees", "Kurtas", "Sarees", "Jeans", "Shoes", "Jewellery", "Handbags"],
-  "Kids' Fashion": ["Boys' Clothing", "Girls' Clothing", "Baby Clothing", "Kids' Shoes", "School Supplies"],
-  "Home & Kitchen": ["Kitchen & Dining", "Furniture", "Home Decor", "Bedding", "Storage & Organization", "Lighting"],
-  "Beauty & Grooming": ["Makeup", "Skincare", "Haircare", "Fragrances", "Men's Grooming", "Personal Care"],
-  "Sports & Fitness": ["Cricket", "Badminton", "Football", "Gym & Fitness", "Cycling", "Camping & Hiking"],
-  "Toys & Games": ["Action Figures", "Board Games", "Dolls", "Puzzles", "Remote Control Toys", "Learning Toys"],
-  "Appliances": ["Washing Machines", "Refrigerators", "Air Conditioners", "Microwaves", "Small Appliances"],
-  "Books": ["Fiction", "Non-Fiction", "Academic", "Children's Books", "Self-Help"],
-  "Grocery & Gourmet": ["Staples", "Snacks & Beverages", "Packaged Food", "Household Supplies"],
-  "Automotive": ["Car Accessories", "Bike Accessories", "Car Care", "Helmets & Gear"],
-  "Pet Supplies": ["Dog Supplies", "Cat Supplies", "Fish & Aquatic", "Birds"],
-  "Health & Personal Care": ["Nutrition", "Health Monitors", "First Aid", "Masks & Sanitizers"]
+// --- CATEGORY DATA STRUCTURE ---
+interface CategoryConfig {
+    subcategories: string[];
+    fields: string[];
+}
+
+export const CATEGORY_DATA: Record<string, CategoryConfig> = {
+  "Electronics": {
+    subcategories: ["Smart TVs", "Speakers", "Headphones", "Smartwatches", "Cameras", "Powerbanks"],
+    fields: ["Brand", "Model", "Color", "Warranty", "Battery Capacity", "Connectivity", "In-Box Items", "Return Policy"]
+  },
+  "Mobiles & Accessories": {
+    subcategories: ["Smartphones", "Feature Phones", "Mobile Cases", "Chargers", "USB Cables", "Screen Guards", "Earbuds"],
+    fields: ["Brand", "RAM", "Storage", "Color", "Battery", "OS Version", "Warranty", "Box Contents", "Compatible Models"]
+  },
+  "Computers & Laptops": {
+    subcategories: ["Laptops", "Desktops", "Monitors", "Keyboards", "Mouse", "Printers", "Laptop Bags"],
+    fields: ["Processor", "RAM", "Storage", "Graphics", "Screen Size", "Warranty", "OS", "Port Types"]
+  },
+  "Home Appliances": {
+    subcategories: ["Refrigerators", "Washing Machines", "AC", "Fans", "Mixer Grinder", "Heaters"],
+    fields: ["Brand", "Capacity", "Energy Rating", "Color", "Power Consumption", "Warranty"]
+  },
+  "Fashion": {
+    subcategories: ["Shirts", "T-Shirts", "Jeans", "Kurti", "Saree", "Dresses", "Shorts", "Jackets"],
+    fields: ["Gender", "Fabric", "Color", "Size", "Pattern", "Fit Type", "Sleeve Type", "Occasion", "Wash Care"]
+  },
+  "Beauty & Personal Care": {
+    subcategories: ["Makeup", "Skincare", "Haircare", "Perfume", "Grooming"],
+    fields: ["Brand", "Skin Type", "Color", "Volume", "Ingredients", "Shelf Life"]
+  },
+  "Grocery & Essentials": {
+    subcategories: ["Oil & Ghee", "Rice & Grains", "Spices", "Snacks", "Beverages", "Breakfast Items"],
+    fields: ["Weight", "Brand", "Shelf Life", "Ingredients"]
+  },
+  "Furniture": {
+    subcategories: ["Sofa", "Bed", "Table", "Chair", "Wardrobe"],
+    fields: ["Material", "Color", "Dimensions", "Weight Capacity", "Warranty", "Assembly Required"]
+  },
+  "Home & Kitchen": {
+    subcategories: ["Cookware", "Storage Containers", "Kitchen Tools", "Dinner Sets"],
+    fields: ["Material", "Color", "Size", "Capacity", "Pack Count"]
+  },
+  "Sports & Fitness": {
+    subcategories: ["Gym Equipment", "Bicycles", "Yoga Mats", "Sports Shoes"],
+    fields: ["Size", "Material", "Color", "Weight Capacity"]
+  },
+  "Toys, Baby & Kids": {
+    subcategories: ["Toys", "Baby Clothes", "School Bags", "Diapers"],
+    fields: ["Age Group", "Material", "Color", "Size", "Safety Info"]
+  },
+  "Books & Stationery": {
+    subcategories: ["Books", "Notebooks", "Pens", "Office Supplies"],
+    fields: ["Author", "Language", "Pages", "Binding Type"]
+  },
+  "Automotive": {
+    subcategories: ["Car Accessories", "Bike Accessories", "Helmets", "Oils & Lubricants"],
+    fields: ["Vehicle Type", "Material", "Color", "Compatibility"]
+  },
+  "Jewellery": {
+    subcategories: ["Rings", "Earrings", "Necklaces", "Bracelets"],
+    fields: ["Material", "Color", "Size", "Weight", "Occasion"]
+  },
+  "Footwear": {
+    subcategories: ["Sports Shoes", "Casual Shoes", "Sandals", "Slippers"],
+    fields: ["Size", "Color", "Material", "Sole Type"]
+  },
+  "Bags, Luggage & Travel": {
+    subcategories: ["Backpacks", "Suitcases", "Handbags"],
+    fields: ["Capacity", "Material", "Color", "Warranty"]
+  },
+  "Pet Supplies": {
+    subcategories: ["Dog Food", "Cat Food", "Toys", "Leashes"],
+    fields: ["Breed Size", "Weight", "Age Range"]
+  },
+  "Tools & Industrial": {
+    subcategories: ["Power Tools", "Hand Tools", "Safety Equipment"],
+    fields: ["Material", "Warranty", "Power Rating"]
+  },
+  "Health & Wellness": {
+    subcategories: ["Supplements", "Medicine (non-prescription)", "Fitness Trackers"],
+    fields: ["Ingredients", "Weight", "Expiry"]
+  },
+  "Home Decor": {
+    subcategories: ["Wall Art", "Showpieces", "Lamps", "Clocks"],
+    fields: ["Material", "Color", "Size", "Weight"]
+  }
 };
+
+// Backwards compatibility export if needed, though we will use CATEGORY_DATA primarily
+export const PRODUCT_CATEGORIES = Object.keys(CATEGORY_DATA).reduce((acc, key) => {
+    acc[key] = CATEGORY_DATA[key].subcategories;
+    return acc;
+}, {} as Record<string, string[]>);
+
 
 // --- Helper: Convert Object Map to Array ---
 const snapshotToArray = <T>(snapshot: any): T[] => {
@@ -374,5 +453,61 @@ export const api = {
 
   saveDeliverySettings: async (settings: DeliverySettings): Promise<void> => {
     await set(ref(db, "settings/delivery"), settings);
+  },
+
+  // --- Payment Settings ---
+  getPaymentSettings: async (): Promise<PaymentSettings> => {
+    try {
+        const snapshot = await get(ref(db, "settings/payment"));
+        if (snapshot.exists()) return snapshot.val();
+        return DEFAULT_PAYMENT_SETTINGS;
+    } catch (error) { return DEFAULT_PAYMENT_SETTINGS; }
+  },
+
+  savePaymentSettings: async (settings: PaymentSettings): Promise<void> => {
+    await set(ref(db, "settings/payment"), settings);
+  },
+
+  // --- Unique Amount Generator for Payments ---
+  getUniquePaymentAmount: async (baseAmount: number): Promise<number> => {
+     try {
+         // Fetch last 50 orders to check recent amounts
+         const snapshot = await get(query(ref(db, 'orders'), limitToLast(50)));
+         const orders = snapshotToArray<Order>(snapshot);
+         
+         const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+         
+         // Find decimals used for the SAME base amount in the last 10 minutes
+         const usedDecimals = new Set<number>();
+         
+         orders.forEach(o => {
+             const orderTime = new Date(o.createdAt).getTime();
+             if (orderTime > tenMinutesAgo) {
+                 const total = o.paymentDetails?.verifiedAmount || o.totalAmount;
+                 if (Math.floor(total) === Math.floor(baseAmount)) {
+                     // Extract decimal part (e.g., 200.15 -> 15)
+                     const decimal = Math.round((total - Math.floor(total)) * 100);
+                     if (decimal > 0) usedDecimals.add(decimal);
+                 }
+             }
+         });
+
+         // Find a random free slot between .10 and .99
+         let attempts = 0;
+         while (attempts < 50) {
+             const randomDecimal = Math.floor(Math.random() * 90) + 10; // 10 to 99
+             if (!usedDecimals.has(randomDecimal)) {
+                 return Number((Math.floor(baseAmount) + (randomDecimal / 100)).toFixed(2));
+             }
+             attempts++;
+         }
+         
+         // Fallback if super crowded (very unlikely)
+         return Number((Math.floor(baseAmount) + 0.11).toFixed(2));
+
+     } catch (e) {
+         // If DB fail, just add random .11
+         return Number((Math.floor(baseAmount) + 0.11).toFixed(2));
+     }
   }
 };
