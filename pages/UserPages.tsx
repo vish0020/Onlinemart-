@@ -6,7 +6,7 @@ import {
   CheckCircle, Search, Mic, Loader, Moon, Sun, 
   Smartphone, Shirt, Home, Sparkles, Gamepad2, Gift, 
   ShoppingBasket, Wrench, Dumbbell, BookOpen, Zap, 
-  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck, LogOut, Laptop, Tv, Car, Smile, TrendingUp, Award, Flame, ShoppingCart, ChevronDown, Copy, QrCode
+  Briefcase, Coffee, Watch, PenTool, PawPrint, MessageSquare, ThumbsUp, Camera, X, Edit2, Trash2, Plus, Minus, Heart, AlertTriangle, Clock, ArrowRight, RotateCcw, MoveHorizontal, Maximize, PlayCircle, LayoutDashboard, UserCog, ShieldCheck, LogOut, Laptop, Tv, Car, Smile, TrendingUp, Award, Flame, ShoppingCart, ChevronDown, Copy, QrCode, Check, Timer, Download, QrCode as QrIcon
 } from 'lucide-react';
 import { Product, CartItem, Order, DeliverySettings, Review, Address, PaymentSettings } from '../types';
 import { Button, Input, ProductCard, Skeleton, ProductSkeleton, AddressForm, Logo } from '../components/Shared';
@@ -664,7 +664,6 @@ export const ProductDetailsPage = () => {
       return sorted;
     }, [reviews, sortOption]);
 
-    // Touch handlers for zoom/swipe...
     const onTouchStart = (e: React.TouchEvent) => {
         if (e.touches.length === 2) {
             const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -723,8 +722,8 @@ export const ProductDetailsPage = () => {
   
     if (!product) return <div className="p-10 text-center text-gray-400">Loading product...</div>;
     
-    const isVideoActive = product.video && activeImg === media.length - 1;
     const discount = product.originalPrice ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
+    const isVideoActive = product.video && activeImg === media.length - 1;
 
     return (
       <div className="pb-10 bg-white dark:bg-gray-900 min-h-screen animate-fade-in relative">
@@ -940,7 +939,6 @@ export const ProductDetailsPage = () => {
     );
 };
 
-// ... [CartPage, CheckoutPage, ProfilePage components remain unchanged] ...
 export const CartPage = () => {
     const { state, dispatch, setShowLoginModal } = useAppContext();
     const navigate = useNavigate();
@@ -987,7 +985,9 @@ export const CheckoutPage = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [uniquePaymentAmount, setUniquePaymentAmount] = useState<number>(0);
     const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
-    const [fetchingSettings, setFetchingSettings] = useState(false);
+    const [paymentState, setPaymentState] = useState<'selection' | 'qr_scan' | 'verifying' | 'app_redirected'>('selection');
+    const [selectedApp, setSelectedApp] = useState<string | null>(null);
+    const [timeLeft, setTimeLeft] = useState(45);
 
     useEffect(() => {
         if (state.cart.length === 0) navigate('/cart');
@@ -1009,35 +1009,61 @@ export const CheckoutPage = () => {
         }
     }, [selectedAddressId, state.cart]);
 
+    // Timer Effect for QR scan
+    useEffect(() => {
+        let interval: any;
+        if ((paymentState === 'qr_scan' || paymentState === 'verifying') && timeLeft > 0) {
+            interval = setInterval(() => {
+                setTimeLeft((prev) => prev - 1);
+            }, 1000);
+        } else if (timeLeft === 0 && paymentState === 'qr_scan') {
+            setPaymentState('verifying');
+        } else if (timeLeft === 0 && paymentState === 'verifying') {
+             // Simulate auto verification success after timer ends in verifying state
+             handlePlaceOrder(uniquePaymentAmount, 'Online', uniquePaymentAmount);
+        }
+        return () => clearInterval(interval);
+    }, [paymentState, timeLeft]);
+
+    // Visibility Change Listener to detect return from Payment App
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && paymentState === 'app_redirected') {
+                 setPaymentState('verifying');
+                 setTimeLeft(5); // fast track verification
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [paymentState]);
+
+
     const initiatePaymentProcess = async () => {
         if (!selectedAddressId) { showToast("Please select a delivery address", "error"); return; }
         
         const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        let total = subtotal + deliveryCost;
-        if (paymentMethod === 'Online') total = Math.round(total * 0.95);
+        const total = subtotal + deliveryCost; // NO DISCOUNT
 
         if (paymentMethod === 'COD') {
             await handlePlaceOrder(total, 'COD');
         } else {
             // Online Payment Flow
             setIsProcessing(true);
-            setFetchingSettings(true);
             try {
-                // 1. Get Payment Settings
                 const settings = await api.getPaymentSettings();
                 setPaymentSettings(settings);
-                
-                // 2. Generate Unique Amount
                 const uniqueAmount = await api.getUniquePaymentAmount(total);
                 setUniquePaymentAmount(uniqueAmount);
                 
-                // 3. Show Modal
+                // Reset states
+                setPaymentState('selection');
+                setSelectedApp(null);
+                setTimeLeft(45);
                 setShowPaymentModal(true);
             } catch (e) {
                 showToast("Failed to initialize payment", "error");
             } finally {
                 setIsProcessing(false);
-                setFetchingSettings(false);
             }
         }
     };
@@ -1046,12 +1072,11 @@ export const CheckoutPage = () => {
         setIsProcessing(true);
         try {
             const address = state.addresses.find(a => a.id === selectedAddressId)!;
-            const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             const order: Order = {
                 id: `ORD-${Date.now()}-${Math.floor(Math.random()*1000)}`,
                 userId: state.user!.id,
                 items: state.cart,
-                totalAmount: finalAmount, // The amount user actually pays
+                totalAmount: finalAmount, 
                 deliveryCharge: deliveryCost,
                 status: 'Ordered',
                 createdAt: new Date().toISOString(),
@@ -1064,7 +1089,8 @@ export const CheckoutPage = () => {
             };
             await api.createOrder(order);
             dispatch({ type: 'CLEAR_CART' });
-            showToast(method === 'Online' ? "Payment Verification Pending. Order Placed!" : "Order Placed Successfully!", "success");
+            setShowPaymentModal(false);
+            showToast("Order Placed Successfully!", "success");
             navigate('/profile');
         } catch (error) { 
             showToast("Failed to place order.", "error"); 
@@ -1084,12 +1110,31 @@ export const CheckoutPage = () => {
         } catch (e) { showToast("Failed to save address", "error"); } finally { setIsProcessing(false); }
     };
 
+    const handleAppPayment = () => {
+        if (!selectedApp) return;
+        setPaymentState('app_redirected');
+        const upiLink = `upi://pay?pa=${paymentSettings.upiId}&pn=${encodeURIComponent(paymentSettings.merchantName)}&am=${uniquePaymentAmount}&cu=INR&tn=OrderPayment`;
+        window.location.href = upiLink;
+    };
+    
+    const handleDownloadQR = () => {
+        // Mock download
+        if (paymentSettings.qrImageUrl) {
+            const link = document.createElement('a');
+            link.href = paymentSettings.qrImageUrl;
+            link.download = 'payment-qr.png';
+            link.target = "_blank";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Downloading QR...", "success");
+        }
+    };
+
     const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const total = subtotal + deliveryCost;
-    
-    // Construct UPI Link
-    // Format: upi://pay?pa=URI&pn=NAME&am=AMOUNT&cu=INR
-    const upiLink = `upi://pay?pa=${paymentSettings.upiId}&pn=${encodeURIComponent(paymentSettings.merchantName)}&am=${uniquePaymentAmount}&cu=INR&tn=OrderPayment`;
+    const baseTotal = total;
+    const paymentCharge = uniquePaymentAmount > 0 ? Number((uniquePaymentAmount - baseTotal).toFixed(2)) : 0;
 
     return (
         <div className="p-4 pb-20 max-w-3xl mx-auto animate-fade-in relative">
@@ -1115,103 +1160,118 @@ export const CheckoutPage = () => {
                     <h2 className="text-lg font-bold flex items-center gap-2 mb-4 dark:text-white"><CreditCard size={20} className="text-primary"/> Payment Method</h2>
                     <div className="space-y-3">
                          {state.deliverySettings.codEnabled && <div onClick={() => setPaymentMethod('COD')} className={`p-4 rounded-lg border-2 cursor-pointer flex items-center gap-3 transition-all ${paymentMethod === 'COD' ? 'border-primary bg-primary/5' : 'border-gray-100 dark:border-gray-700'}`}><div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'COD' ? 'border-primary' : 'border-gray-300'}`}>{paymentMethod === 'COD' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}</div><span className="font-medium dark:text-white">Cash on Delivery</span></div>}
-                         <div onClick={() => setPaymentMethod('Online')} className={`p-4 rounded-lg border-2 cursor-pointer flex items-center gap-3 transition-all ${paymentMethod === 'Online' ? 'border-primary bg-primary/5' : 'border-gray-100 dark:border-gray-700'}`}><div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'Online' ? 'border-primary' : 'border-gray-300'}`}>{paymentMethod === 'Online' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}</div><div className="flex-1"><span className="font-medium dark:text-white">Pay Online (UPI / Card)</span><p className="text-xs text-green-600">Extra 5% discount on online payment</p></div></div>
+                         <div onClick={() => setPaymentMethod('Online')} className={`p-4 rounded-lg border-2 cursor-pointer flex items-center gap-3 transition-all ${paymentMethod === 'Online' ? 'border-primary bg-primary/5' : 'border-gray-100 dark:border-gray-700'}`}><div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'Online' ? 'border-primary' : 'border-gray-300'}`}>{paymentMethod === 'Online' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}</div><div className="flex-1"><span className="font-medium dark:text-white">Pay Online (UPI / Card)</span></div></div>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border dark:border-gray-700 animate-slide-up">
                     <h2 className="text-lg font-bold mb-4 dark:text-white">Order Summary</h2>
-                    <div className="space-y-2 text-sm mb-4"><div className="flex justify-between dark:text-gray-300"><span>Items Total</span><span>₹{subtotal}</span></div><div className="flex justify-between dark:text-gray-300"><span>Delivery Charges</span><span className={deliveryCost === 0 ? "text-green-500 font-bold" : ""}>{deliveryCost === 0 ? "FREE" : `₹${deliveryCost}`}</span></div>{paymentMethod === 'Online' && <div className="flex justify-between text-green-600"><span>Online Payment Discount (5%)</span><span>- ₹{Math.round(total * 0.05)}</span></div>}</div>
-                    <div className="border-t dark:border-gray-700 pt-4 flex justify-between font-bold text-xl dark:text-white mb-6"><span>Total Payable</span><span>₹{paymentMethod === 'Online' ? Math.round(total * 0.95) : total}</span></div>
-                    <Button onClick={initiatePaymentProcess} className="w-full py-4 text-lg" isLoading={isProcessing}>{isProcessing ? 'Processing...' : `Place Order • ₹${paymentMethod === 'Online' ? Math.round(total * 0.95) : total}`}</Button>
+                    <div className="space-y-2 text-sm mb-4"><div className="flex justify-between dark:text-gray-300"><span>Items Total</span><span>₹{subtotal}</span></div><div className="flex justify-between dark:text-gray-300"><span>Delivery Charges</span><span className={deliveryCost === 0 ? "text-green-500 font-bold" : ""}>{deliveryCost === 0 ? "FREE" : `₹${deliveryCost}`}</span></div></div>
+                    <div className="border-t dark:border-gray-700 pt-4 flex justify-between font-bold text-xl dark:text-white mb-6"><span>Total Payable</span><span>₹{total}</span></div>
+                    <Button onClick={initiatePaymentProcess} className="w-full py-4 text-lg" isLoading={isProcessing}>{isProcessing ? 'Processing...' : `Place Order • ₹${total}`}</Button>
                 </div>
             </div>
 
-            {/* Payment Modal */}
+            {/* Modern Payment Modal */}
             {showPaymentModal && (
                 <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center animate-fade-in p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl p-6 relative animate-slide-up border dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 relative animate-slide-up border dark:border-gray-700 max-h-[90vh] overflow-y-auto flex flex-col">
                         <button onClick={() => setShowPaymentModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={24} /></button>
                         
+                        {/* Header */}
                         <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold dark:text-white mb-1">Complete Payment</h2>
-                            <p className="text-sm text-gray-500">Pay exactly this amount to verify instantly</p>
-                            <div className="text-4xl font-black text-primary my-4">₹{uniquePaymentAmount}</div>
-                            <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-xs px-3 py-2 rounded-lg inline-block">
-                                Note: ₹{uniquePaymentAmount} includes a unique code for verification
+                            <p className="text-gray-500 text-sm mb-1">Total Payable</p>
+                            <div className="text-4xl font-black text-gray-900 dark:text-white">₹{uniquePaymentAmount}</div>
+                            
+                            <div className="mt-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 text-sm space-y-1">
+                                <div className="flex justify-between text-gray-500"><span>Order Amount</span><span>₹{baseTotal}</span></div>
+                                <div className="flex justify-between text-gray-500"><span>Payment Charges</span><span>+ ₹{paymentCharge}</span></div>
+                                <div className="flex justify-between font-bold border-t dark:border-gray-600 pt-2 mt-2 dark:text-white"><span>Total</span><span>₹{uniquePaymentAmount}</span></div>
                             </div>
                         </div>
 
-                        {/* Deep Links Grid */}
-                        {paymentSettings.enableDeepLink && (
-                            <div className="mb-6">
-                                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Pay with App</h3>
-                                <div className="grid grid-cols-4 gap-4">
+                        {paymentState === 'verifying' ? (
+                             <div className="flex-1 flex flex-col items-center justify-center py-10">
+                                 <Loader className="animate-spin text-primary mb-4" size={48} />
+                                 <h3 className="text-xl font-bold dark:text-white">Verifying Payment...</h3>
+                                 <p className="text-gray-500 text-sm mt-2">Please wait while we confirm your transaction</p>
+                             </div>
+                        ) : paymentState === 'qr_scan' ? (
+                             <div className="flex-1 flex flex-col items-center animate-fade-in">
+                                 <div className="relative bg-white p-4 rounded-xl shadow-lg border-2 border-primary mb-6">
+                                     {paymentSettings.qrImageUrl ? <img src={paymentSettings.qrImageUrl} className="w-48 h-48 object-contain" /> : <div className="w-48 h-48 bg-gray-100 flex items-center justify-center text-gray-400">QR Not Set</div>}
+                                     <div className="absolute -top-3 -right-3 bg-primary text-black font-bold text-xs px-2 py-1 rounded-full shadow-md">Scan Me</div>
+                                 </div>
+                                 
+                                 <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700/50 px-4 py-2 rounded-full mb-6 max-w-full">
+                                     <span className="font-mono text-sm truncate dark:text-white">{paymentSettings.upiId}</span>
+                                     <button onClick={() => { navigator.clipboard.writeText(paymentSettings.upiId); showToast("UPI ID Copied", "success"); }} className="text-primary hover:text-primary-dark"><Copy size={16}/></button>
+                                 </div>
+
+                                 <div className="flex items-center gap-2 text-primary font-bold mb-6">
+                                     <Timer className="animate-pulse" size={20} />
+                                     <span>{timeLeft}s remaining</span>
+                                 </div>
+
+                                 <div className="flex gap-4 w-full">
+                                    <Button variant="outline" className="flex-1" onClick={() => setPaymentState('selection')}>Back</Button>
+                                    <Button className="flex-1" onClick={handleDownloadQR}><Download size={18}/> Download QR</Button>
+                                 </div>
+                             </div>
+                        ) : (
+                            /* Selection State */
+                            <div className="flex-1 space-y-6">
+                                <h3 className="font-bold text-gray-900 dark:text-white mb-2">Select Payment Mode</h3>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* QR Option */}
+                                    <div 
+                                        onClick={() => { setPaymentState('qr_scan'); setTimeLeft(45); }}
+                                        className="p-4 rounded-xl border-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 flex flex-col items-center justify-center gap-2 transition-all border-gray-200 dark:border-gray-700"
+                                    >
+                                        <QrIcon size={32} className="text-gray-600 dark:text-gray-300"/>
+                                        <span className="text-sm font-bold dark:text-white">Scan QR</span>
+                                    </div>
+
+                                    {/* App Options */}
                                     {paymentSettings.supportedApps.googlePay && (
-                                        <a href={upiLink} className="flex flex-col items-center gap-1 group">
-                                            <div className="w-12 h-12 bg-white border rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                                                <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" className="w-8 h-8 object-contain" />
+                                        <div onClick={() => setSelectedApp('googlePay')} className={`relative p-4 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${selectedApp === 'googlePay' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-700'}`}>
+                                            <div className="w-10 h-10 bg-white border rounded-full flex items-center justify-center shadow-sm">
+                                                 <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" className="w-6 h-6 object-contain" />
                                             </div>
-                                            <span className="text-[10px] font-medium dark:text-gray-300">GPay</span>
-                                        </a>
+                                            <span className="text-sm font-bold dark:text-white">GPay</span>
+                                            {selectedApp === 'googlePay' && <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center"><Check size={12} className="text-black"/></div>}
+                                        </div>
                                     )}
                                     {paymentSettings.supportedApps.phonePe && (
-                                        <a href={upiLink} className="flex flex-col items-center gap-1 group">
-                                            <div className="w-12 h-12 bg-[#5f259f] border rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all text-white font-bold text-xs">
-                                                Pe
-                                            </div>
-                                            <span className="text-[10px] font-medium dark:text-gray-300">PhonePe</span>
-                                        </a>
+                                        <div onClick={() => setSelectedApp('phonePe')} className={`relative p-4 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${selectedApp === 'phonePe' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-700'}`}>
+                                            <div className="w-10 h-10 bg-[#5f259f] border rounded-full flex items-center justify-center shadow-sm text-white font-bold text-[10px]">Pe</div>
+                                            <span className="text-sm font-bold dark:text-white">PhonePe</span>
+                                            {selectedApp === 'phonePe' && <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center"><Check size={12} className="text-black"/></div>}
+                                        </div>
                                     )}
                                     {paymentSettings.supportedApps.paytm && (
-                                        <a href={upiLink} className="flex flex-col items-center gap-1 group">
-                                            <div className="w-12 h-12 bg-white border rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                                                <img src="https://assetscdn1.paytm.com/images/catalog/view/310944/1697527183231.png" className="w-8 h-8 object-contain" />
-                                            </div>
-                                            <span className="text-[10px] font-medium dark:text-gray-300">Paytm</span>
-                                        </a>
-                                    )}
-                                    {paymentSettings.supportedApps.bhim && (
-                                        <a href={upiLink} className="flex flex-col items-center gap-1 group">
-                                            <div className="w-12 h-12 bg-white border rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                                                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/BHIM_Logo.svg/1200px-BHIM_Logo.svg.png" className="w-8 h-8 object-contain" />
-                                            </div>
-                                            <span className="text-[10px] font-medium dark:text-gray-300">BHIM</span>
-                                        </a>
-                                    )}
-                                     <a href={upiLink} className="flex flex-col items-center gap-1 group">
-                                        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                                            <Smartphone size={20} className="text-gray-500"/>
+                                        <div onClick={() => setSelectedApp('paytm')} className={`relative p-4 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${selectedApp === 'paytm' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-700'}`}>
+                                            <div className="w-10 h-10 bg-white border rounded-full flex items-center justify-center shadow-sm"><img src="https://assetscdn1.paytm.com/images/catalog/view/310944/1697527183231.png" className="w-6 h-6 object-contain" /></div>
+                                            <span className="text-sm font-bold dark:text-white">Paytm</span>
+                                            {selectedApp === 'paytm' && <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center"><Check size={12} className="text-black"/></div>}
                                         </div>
-                                        <span className="text-[10px] font-medium dark:text-gray-300">Other</span>
-                                    </a>
+                                    )}
+                                    <div onClick={() => setSelectedApp('other')} className={`relative p-4 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${selectedApp === 'other' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-700'}`}>
+                                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shadow-sm"><Smartphone size={20} className="text-gray-500"/></div>
+                                        <span className="text-sm font-bold dark:text-white">Other</span>
+                                        {selectedApp === 'other' && <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center"><Check size={12} className="text-black"/></div>}
+                                    </div>
                                 </div>
+
+                                <Button 
+                                    onClick={handleAppPayment} 
+                                    className="w-full py-4 text-lg font-bold shadow-lg"
+                                    disabled={!selectedApp}
+                                >
+                                    Pay ₹{uniquePaymentAmount}
+                                </Button>
                             </div>
                         )}
-
-                        {/* QR Code Section */}
-                        {paymentSettings.enableQr && (
-                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl flex flex-col items-center mb-6">
-                                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 self-start w-full">Scan QR Code</h3>
-                                {paymentSettings.qrImageUrl ? (
-                                    <img src={paymentSettings.qrImageUrl} className="w-48 h-48 object-contain bg-white p-2 rounded-lg" />
-                                ) : (
-                                    <div className="w-48 h-48 bg-white flex items-center justify-center text-gray-400 text-xs">QR Not Configured</div>
-                                )}
-                                <div className="flex items-center gap-2 mt-3 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-full border dark:border-gray-600">
-                                    <span className="text-xs font-mono dark:text-white">{paymentSettings.upiId}</span>
-                                    <button onClick={() => { navigator.clipboard.writeText(paymentSettings.upiId); showToast("UPI ID Copied", "success"); }} className="text-primary hover:text-primary-dark">
-                                        <Copy size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        <Button 
-                            onClick={() => handlePlaceOrder(uniquePaymentAmount, 'Online', uniquePaymentAmount)} 
-                            className="w-full py-4 text-lg bg-green-600 hover:bg-green-700 text-white"
-                        >
-                            I have Paid ₹{uniquePaymentAmount}
-                        </Button>
                     </div>
                 </div>
             )}
