@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -70,6 +71,48 @@
       /* Fix for Leaflet z-index issues with sticky headers */
       .leaflet-pane { z-index: 10; }
       .leaflet-top, .leaflet-bottom { z-index: 20; }
+
+      /* Glassmorphism Utilities */
+      .glass {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      
+      .dark .glass {
+        background: rgba(17, 24, 39, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      .dark .glass-card {
+        background: rgba(31, 41, 55, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Subtle animated mesh gradient background */
+      body {
+        background-color: #f8fafc;
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(47, 96%, 89%, 1) 0, transparent 50%), 
+          radial-gradient(at 100% 0%, hsla(200, 96%, 93%, 1) 0, transparent 50%); 
+        background-attachment: fixed;
+      }
+      .dark body {
+        background-color: #111827;
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(47, 50%, 15%, 1) 0, transparent 50%), 
+          radial-gradient(at 100% 0%, hsla(200, 50%, 15%, 1) 0, transparent 50%);
+      }
     </style>
   <script type="importmap">
 {
@@ -88,7 +131,7 @@
 }
 </script>
 </head>
-  <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased selection:bg-primary selection:text-black">
+  <body class="text-gray-900 dark:text-gray-100 antialiased selection:bg-primary selection:text-black">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
