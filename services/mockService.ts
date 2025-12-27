@@ -380,22 +380,37 @@ export const api = {
   },
 
   createOrder: async (order: Order): Promise<void> => {
-      // Use Transaction to handle stock deduction
-      for (const item of order.items) {
-          const productRef = ref(db, `products/${item.id}`);
-          await runTransaction(productRef, (currentData) => {
-              if (currentData) {
-                  if (currentData.stock < item.quantity) {
-                      throw new Error(`Insufficient stock for ${item.name}`);
-                  }
-                  currentData.stock -= item.quantity;
-              }
-              return currentData;
-          });
-      }
-      // Save order
-      await set(ref(db, `orders/${order.id}`), order);
-  },
+    // Use Transaction to handle stock deduction
+    for (const item of order.items) {
+        const productRef = ref(db, `products/${item.id}`);
+        await runTransaction(productRef, (currentData) => {
+            if (currentData) {
+                if (currentData.stock < item.quantity) {
+                    throw new Error(`Insufficient stock for ${item.name}`);
+                }
+                currentData.stock -= item.quantity;
+            }
+            return currentData;
+        });
+    }
+
+    // 🔥 FIX: remove undefined values before saving to Firebase
+    const safeOrder: any = { ...order };
+
+    if (order.paymentDetails) {
+        safeOrder.paymentDetails = {
+            method: order.paymentDetails.method ?? "COD",
+            status: order.paymentDetails.status ?? "PENDING",
+            transactionId: order.paymentDetails.transactionId ?? "",
+            verifiedAmount: order.paymentDetails.verifiedAmount ?? null,
+        };
+    } else {
+        delete safeOrder.paymentDetails;
+    }
+
+    // Save order (Firebase-safe)
+    await set(ref(db, `orders/${order.id}`), safeOrder);
+},
 
   updateOrderStatus: async (orderId: string, status: OrderStatus): Promise<void> => {
     await update(ref(db, `orders/${orderId}`), { status });
