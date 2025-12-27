@@ -140,64 +140,80 @@ interface ProductCardProps {
   onClick: () => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, onToggleWishlist, isWishlisted, onClick }) => (
-  <div onClick={onClick} className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative border border-gray-100 dark:border-gray-700 animate-fade-in">
-    <button 
-      onClick={(e) => { e.stopPropagation(); onToggleWishlist(e); }}
-      className="absolute top-2 right-2 z-10 p-2 bg-white/80 dark:bg-black/50 backdrop-blur-sm rounded-full shadow-sm hover:scale-110 transition-transform active:scale-95"
+export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, onToggleWishlist, isWishlisted, onClick }) => {
+  // ડિસ્કાઉન્ટ ગણવા માટે (જો MRP હોય તો)
+  const discount = product.mrp ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0;
+
+  return (
+    <div 
+      onClick={onClick} 
+      className="group bg-white dark:bg-gray-800 rounded-[32px] p-3 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer relative border border-gray-100 dark:border-gray-700 animate-fade-in flex flex-col gap-3"
     >
-      <Heart className={`w-5 h-5 transition-colors ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600 dark:text-gray-300'}`} />
-    </button>
+      {/* ઈમેજ કન્ટેનર */}
+      <div className="relative aspect-square rounded-[24px] overflow-hidden bg-gray-100 dark:bg-gray-900">
+        <img 
+          src={product.images && product.images.length > 0 ? product.images[0] : 'https://via.placeholder.com/300?text=No+Image'} 
+          alt={product.name}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+          loading="lazy"
+        />
 
-    <div className="relative aspect-[1/1] overflow-hidden bg-gray-100 dark:bg-gray-900">
-      <img 
-        src={product.images && product.images.length > 0 ? product.images[0] : 'https://via.placeholder.com/300?text=No+Image'} 
-        alt={product.name}
-        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-        loading="lazy"
-      />
-      {product.stock < 5 && product.stock > 0 && (
-        <span className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg animate-pulse">
-          Only {product.stock} left!
-        </span>
-      )}
-      {product.stock === 0 && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
-          <span className="text-white font-bold uppercase tracking-wider text-sm border-2 border-white px-3 py-1">Out of Stock</span>
+        {/* Rating Badge (ડાબી બાજુ ઉપર - ફોટામાં છે તેમ) */}
+        <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+          <span className="text-[10px] font-bold text-gray-900">{product.rating || '4.8'}</span>
+          <Star size={10} className="fill-black text-black" />
         </div>
-      )}
-    </div>
 
-    <div className="p-4">
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{product.category}</p>
-      <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight h-10 mb-2 group-hover:text-primary transition-colors">
-        {product.name}
-      </h3>
-      
-      <div className="flex items-center gap-1 mb-3">
-        <Star className="w-3.5 h-3.5 fill-primary text-primary" />
-        <span className="text-xs font-bold dark:text-gray-200">{product.rating}</span>
-        <span className="text-[10px] text-gray-400">({product.reviewCount})</span>
-      </div>
-
-      <div className="flex items-center justify-between mt-2">
-        <div>
-          <span className="text-lg font-bold text-gray-900 dark:text-white">₹{product.price}</span>
-          {product.originalPrice && (
-            <span className="text-xs text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
-          )}
-        </div>
+        {/* Wishlist Button (જમણી બાજુ ઉપર) */}
         <button 
-          onClick={(e) => { e.stopPropagation(); onAdd(e); }}
-          className="bg-primary text-black p-2 rounded-lg hover:bg-primary-dark transition-all shadow-md active:scale-90 hover:shadow-lg disabled:opacity-50 disabled:active:scale-100"
-          disabled={product.stock === 0}
+          onClick={(e) => { e.stopPropagation(); onToggleWishlist(e); }}
+          className="absolute top-2 right-2 z-10 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-sm hover:scale-110 transition-transform active:scale-95"
         >
-          <Plus className="w-5 h-5" />
+          <Heart className={`w-5 h-5 transition-colors ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
         </button>
+
+        {/* Stock Status */}
+        {product.stock < 5 && product.stock > 0 && (
+          <span className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            Only {product.stock} left!
+          </span>
+        )}
+      </div>
+
+      {/* વિગતો (નામ અને કિંમત) */}
+      <div className="px-1 pb-1">
+        <h3 className="font-bold text-gray-800 dark:text-gray-100 text-sm line-clamp-1 mb-1">
+          {product.name}
+        </h3>
+        
+        <div className="flex items-end justify-between">
+          <div className="flex flex-col">
+            <span className="text-lg font-black text-gray-900 dark:text-white leading-tight">
+              ₹{product.price}
+            </span>
+            <div className="flex items-center gap-2">
+              {product.mrp && <span className="text-[10px] text-gray-400 line-through">₹{product.mrp}</span>}
+              {discount > 0 && (
+                <span className="text-[10px] font-bold text-green-600 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">
+                  {discount}% OFF
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* કાળું '+' બટન (નીચે જમણી બાજુ) */}
+          <button 
+            onClick={(e) => { e.stopPropagation(); onAdd(); }}
+            className="w-10 h-10 bg-black dark:bg-white dark:text-black text-white rounded-[14px] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
+          >
+            <Plus size={20} strokeWidth={3} />
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
+
 
 export const Skeleton: React.FC<{ className: string }> = ({ className }) => (
   <div className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`} />
